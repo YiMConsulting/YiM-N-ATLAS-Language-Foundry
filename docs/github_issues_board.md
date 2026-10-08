@@ -1,7 +1,7 @@
 # 📋 GitHub Issues & Project Board Setup
 
 > **Project:** N-ATLAS Language Foundry  
-> **Team:** 3 Members (Olusegun / Person 1, Person 2, Person 3)  
+> **Team:** 3 Members (Olusegun / Person 1, Gilbert, James)  
 > **Schedule:** Day 1 (Build Core Pipeline & Shell) → Day 2 (Vertical Slice Integration) → Day 3 (Verification & Submission)
 
 ---
@@ -18,7 +18,7 @@ Create a new GitHub Project (Table / Board view) with the following 5 columns:
 
 Add Custom Fields:
 - **Milestone:** `Day 1 - Core AI Pipeline & Shell`, `Day 2 - Complete Vertical Slice`, `Day 3 - Submission & Evidence`
-- **Owner:** `Olusegun (AI/ML & Backend)`, `Person 2 (Full-stack UI)`, `Person 3 (Review & Docs)`
+- **Owner:** `Olusegun (AI/ML & Backend)`, `Gilbert (Full-stack UI)`, `James (Review & Docs)`
 - **Priority:** `P0 (Critical Path)`, `P1 (Important)`, `P2 (Nice to have)`
 
 ---
@@ -57,7 +57,7 @@ Add Custom Fields:
   ```
 
 #### Issue #3: [Frontend] Next.js Application Shell & Layout Setup
-* **Assignee:** Person 2 (Full-Stack UI)
+* **Assignee:** Gilbert (Full-Stack UI)
 * **Labels:** `frontend`, `p0-critical`, `milestone-day1`
 * **Description:**
   ```markdown
@@ -90,7 +90,7 @@ Add Custom Fields:
   ```
 
 #### Issue #5: [Docs/Review] Review Workflow & Evidence Schema Setup
-* **Assignee:** Person 3 (Full-Stack + Docs)
+* **Assignee:** James (James)
 * **Labels:** `review`, `docs`, `milestone-day1`
 * **Description:**
   ```markdown
@@ -147,7 +147,7 @@ Add Custom Fields:
   ```
 
 #### Issue #9: [Frontend] Experiment Comparison & Results Dashboard
-* **Assignee:** Person 2 (Full-Stack UI)
+* **Assignee:** Gilbert (Full-Stack UI)
 * **Labels:** `frontend`, `milestone-day2`
 * **Description:**
   ```markdown
@@ -158,7 +158,7 @@ Add Custom Fields:
   ```
 
 #### Issue #10: [Frontend] Interactive Playground for Inference
-* **Assignee:** Person 2 (Full-Stack UI)
+* **Assignee:** Gilbert (Full-Stack UI)
 * **Labels:** `frontend`, `milestone-day2`
 * **Description:**
   ```markdown
@@ -169,7 +169,7 @@ Add Custom Fields:
   ```
 
 #### Issue #11: [Validation] Coordinate 2 External Beta Testers (PS1 Requirement)
-* **Assignee:** Person 3 (Full-Stack + Docs)
+* **Assignee:** James (James)
 * **Labels:** `validation`, `p0-critical`, `milestone-day2`
 * **Description:**
   ```markdown
@@ -185,7 +185,7 @@ Add Custom Fields:
 ### 🗓️ Milestone: Day 3 — Submission & Evidence
 
 #### Issue #12: [Submission] Clean Environment Reproduction Test
-* **Assignee:** Person 3 (Full-Stack + Docs)
+* **Assignee:** James (James)
 * **Labels:** `testing`, `reproducibility`, `milestone-day3`
 * **Description:**
   ```markdown
@@ -195,7 +195,7 @@ Add Custom Fields:
   ```
 
 #### Issue #13: [Media] 3–5 Minute Video Demo Recording
-* **Assignee:** Person 2 & 3
+* **Assignee:** Gilbert & 3
 * **Labels:** `video`, `submission`, `milestone-day3`
 * **Description:**
   ```markdown
