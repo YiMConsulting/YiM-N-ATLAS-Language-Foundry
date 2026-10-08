@@ -12,11 +12,11 @@
 The Foundry separates **AI/ML & Training execution (FastAPI backend)** from the **Dashboard, Reviewer portal & Playground (Next.js frontend)**. This API contract defines the exact interface connecting the two layers.
 
 ```
-   [ Next.js Frontend / Gilbert & 3 ]
+   [ Next.js Frontend / Gilbert ]
                   |
              HTTP / REST
                   v
-       [ FastAPI Backend / Person 1 ]
+       [ FastAPI Backend / James ]
          |             |             |
    [ SQLite DB ]  [ N-ATLAS ]   [ PEFT LoRA ]
    (Metadata)     (Base Model)  (Igala Adapter)
