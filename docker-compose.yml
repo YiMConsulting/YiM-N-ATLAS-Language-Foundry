@@ -13,8 +13,11 @@ services:
       - .env
 
     volumes:
-      - ./data:/app/data
-      - ./experiments:/app/experiments
-      - ./outputs:/app/outputs
+      - ./data:/app/data:z
+      - ./experiments:/app/experiments:z
+      - ./outputs:/app/outputs:z
+      - ./api:/app/api:z
+      - ./tests:/app/tests:z
+      - ./foundry:/app/foundry:z
 
     restart: unless-stopped
