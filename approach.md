@@ -120,3 +120,18 @@ The local machine will mainly be used for backend/API development, frontend deve
 I verified that the Docker setup builds successfully, uses Python 3.11, loads the required API dependencies, and correctly mounts the project directories.
 
 This keeps the local development environment isolated and reproducible without requiring CUDA or an NVIDIA GPU on the development machine.
+
+
+### Checkpoint 0.2 — N-ATLaS Access and Inference Verification
+
+Before starting the language adaptation pipeline, I verified that the N-ATLaS model can be accessed and run in the intended GPU environment.
+
+The smoke test was performed on Kaggle using Tesla T4 GPUs. PyTorch detected the GPU correctly, and Hugging Face authentication was successful.
+
+The `NCAIR1/N-ATLaS` model was successfully accessed and loaded through Transformers. The model was identified as a `LlamaForCausalLM` architecture, and the tokenizer loaded correctly.
+
+A simple inference test was also completed successfully. The model generated a response to a basic prompt, confirming that the complete path from the Kaggle GPU environment to N-ATLaS model loading and inference is working.
+
+The smoke-test notebook is saved as `notebooks/00_natlas_smoke_test.ipynb` so the environment and verification steps can be reproduced later.
+
+This checkpoint confirms that the project can proceed to designing the generic language and dataset contracts. No training or LoRA implementation was performed at this stage.
