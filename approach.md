@@ -106,3 +106,17 @@ A cornerstone of our engineering ethics is transparent scientific reporting:
 The architecture designed here for Igala is modular:
 * Adding a new language (e.g., Ebira, Nupe, Tiv, Kanuri, Berom) requires solely registering the ISO code and submitting raw records through the audited pipeline.
 * The Foundry automates the audit, split, training orchestration, and comparative reporting uniformly.
+
+### Local Development Environment
+
+For the local development environment, I decided to use Docker to provide a consistent Python runtime instead of installing Python 3.11 directly on my laptop.
+
+My host machine is currently running Python 3.14, while the project is targeting Python 3.11. Rather than changing the host Python installation or creating a setup that depends on the local machine, the API environment is now running inside a Python 3.11 Docker container.
+
+I also separated the project dependencies into API, development, and ML requirements. This keeps the local backend environment lightweight and avoids installing GPU/ML packages such as PyTorch, Transformers, PEFT, and bitsandbytes on the laptop.
+
+The local machine will mainly be used for backend/API development, frontend development, testing, Git, and other lightweight development tasks. The actual N-ATLaS model work and LoRA/QLoRA training will be handled in a GPU environment, with Kaggle as the primary option and Google Colab as a fallback.
+
+I verified that the Docker setup builds successfully, uses Python 3.11, loads the required API dependencies, and correctly mounts the project directories.
+
+This keeps the local development environment isolated and reproducible without requiring CUDA or an NVIDIA GPU on the development machine.

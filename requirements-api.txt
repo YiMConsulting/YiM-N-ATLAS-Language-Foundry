@@ -1,0 +1,16 @@
+# Runtime
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+pyyaml
+requests
+
+# Data processing
+pandas
+numpy
+scikit-learn
+
+# Testing
+pytest
+pytest-asyncio

@@ -1,0 +1,19 @@
+# Core ML
+torch
+transformers
+peft
+accelerate
+bitsandbytes
+
+# Data
+datasets
+pandas
+numpy
+scikit-learn
+
+# Evaluation
+sacrebleu
+
+# Configuration
+pyyaml
+requests
