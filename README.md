@@ -70,8 +70,8 @@ The architecture is deliberately lean, self-contained, and free of unnecessary c
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/<your-org>/n-atlas-language-foundry.git
-cd n-atlas-language-foundry
+git clone https://github.com/YiMConsulting/YiM-N-ATLAS-Language-Foundry.git
+cd YiM-N-ATLAS-Language-Foundry
 
 # 2. Create virtual environment
 python -m venv .venv
