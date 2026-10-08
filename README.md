@@ -39,9 +39,9 @@ For this MVP, the Foundry proves one complete, end-to-end language expansion jou
 
 | Role | Member | Primary Focus | Key Deliverables |
 | :--- | :--- | :--- | :--- |
-| **Person 1 (Lead)** | **Olusegun** | AI/ML + Backend Lead | N-ATLAS integration, model loading, LoRA/QLoRA training, data pipeline, evaluation engine, FastAPI services |
-| **Gilbert** | Gilbert | UI / Dashboard Lead | Next.js dashboard, language registry, dataset audit UI, real-time training monitor, side-by-side comparison playground |
-| **James** | James | Review Workflow & Validation | Human review interface, external beta tester logs, documentation, demo video script, submission checklist |
+| **Kickoff Lead + Coordination** | **Olusegun** | Project Kickoff, GitHub Setup, Docs & Submission | Branch setup, API contract, GitHub issues board, README, approach.md, submission checklist, final submission coordination |
+| **AI/ML + Backend Lead** | **James** | N-ATLAS Integration, Training Pipeline & API | N-ATLAS model loading, data ingestion & quality audit, LoRA/QLoRA training, evaluation engine (BLEU, chrF), FastAPI endpoints |
+| **Full-Stack Frontend Lead** | **Gilbert** | Dashboard & Playground UI | Next.js app, language registry page, dataset audit UI, experiment status monitor, base-vs-adapted comparison, interactive playground |
 
 ---
 

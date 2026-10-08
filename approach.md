@@ -2,7 +2,7 @@
 
 > **Target Challenge:** National AI Innovation Challenge (NAIC 2026)  
 > **Problem Statement 1:** Developer Infrastructure  
-> **Author & ML Lead:** Olusegun  
+> **Author & ML Lead:** James  
 > **Current Status:** Day 1 Kickoff & Pipeline Ingestion
 
 ---

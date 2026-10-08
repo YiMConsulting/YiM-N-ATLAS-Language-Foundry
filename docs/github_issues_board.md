@@ -18,7 +18,7 @@ Create a new GitHub Project (Table / Board view) with the following 5 columns:
 
 Add Custom Fields:
 - **Milestone:** `Day 1 - Core AI Pipeline & Shell`, `Day 2 - Complete Vertical Slice`, `Day 3 - Submission & Evidence`
-- **Owner:** `Olusegun (AI/ML & Backend)`, `Gilbert (Full-stack UI)`, `James (Review & Docs)`
+- **Owner:** `James (AI/ML & Backend)`, `Gilbert (Full-stack UI)`, `James (Review & Docs)`
 - **Priority:** `P0 (Critical Path)`, `P1 (Important)`, `P2 (Nice to have)`
 
 ---
@@ -28,7 +28,7 @@ Add Custom Fields:
 ### 🗓️ Milestone: Day 1 — Core AI Pipeline & Shell
 
 #### Issue #1: [Kickoff] Git Setup, Branching & Section 11 API Contract Alignment
-* **Assignee:** Olusegun (Person 1)
+* **Assignee:** James (AI/ML & Backend)
 * **Labels:** `setup`, `p0-critical`, `milestone-day1`
 * **Description:**
   ```markdown
@@ -42,7 +42,7 @@ Add Custom Fields:
   ```
 
 #### Issue #2: [AI/ML] N-ATLAS Access & Inference Smoke Test
-* **Assignee:** Olusegun (Person 1)
+* **Assignee:** James (AI/ML & Backend)
 * **Labels:** `backend`, `ml`, `p0-critical`, `milestone-day1`
 * **Description:**
   ```markdown
@@ -57,7 +57,7 @@ Add Custom Fields:
   ```
 
 #### Issue #3: [Frontend] Next.js Application Shell & Layout Setup
-* **Assignee:** Gilbert (Full-Stack UI)
+* **Assignee:** Gilbert (Full-Stack Frontend)
 * **Labels:** `frontend`, `p0-critical`, `milestone-day1`
 * **Description:**
   ```markdown
@@ -76,7 +76,7 @@ Add Custom Fields:
   ```
 
 #### Issue #4: [AI/ML] Ingestion, Automated Quality Audit & Manifest Generation
-* **Assignee:** Olusegun (Person 1)
+* **Assignee:** James (AI/ML & Backend)
 * **Labels:** `backend`, `ml`, `data`, `milestone-day1`
 * **Description:**
   ```markdown
@@ -104,7 +104,7 @@ Add Custom Fields:
   ```
 
 #### Issue #6: [AI/ML] Deterministic Split & Baseline N-ATLAS Evaluation
-* **Assignee:** Olusegun (Person 1)
+* **Assignee:** James (AI/ML & Backend)
 * **Labels:** `backend`, `ml`, `eval`, `milestone-day1`
 * **Description:**
   ```markdown
@@ -118,7 +118,7 @@ Add Custom Fields:
   ```
 
 #### Issue #7: [AI/ML] LoRA / QLoRA Adaptation Experiment Run
-* **Assignee:** Olusegun (Person 1)
+* **Assignee:** James (AI/ML & Backend)
 * **Labels:** `backend`, `ml`, `p0-critical`, `milestone-day1`
 * **Description:**
   ```markdown
@@ -136,7 +136,7 @@ Add Custom Fields:
 ### 🗓️ Milestone: Day 2 — Complete Vertical Slice
 
 #### Issue #8: [AI/ML] Post-Adaptation Evaluation & Regression Sanity Check
-* **Assignee:** Olusegun (Person 1)
+* **Assignee:** James (AI/ML & Backend)
 * **Labels:** `backend`, `ml`, `eval`, `milestone-day2`
 * **Description:**
   ```markdown
@@ -147,7 +147,7 @@ Add Custom Fields:
   ```
 
 #### Issue #9: [Frontend] Experiment Comparison & Results Dashboard
-* **Assignee:** Gilbert (Full-Stack UI)
+* **Assignee:** Gilbert (Full-Stack Frontend)
 * **Labels:** `frontend`, `milestone-day2`
 * **Description:**
   ```markdown
@@ -158,7 +158,7 @@ Add Custom Fields:
   ```
 
 #### Issue #10: [Frontend] Interactive Playground for Inference
-* **Assignee:** Gilbert (Full-Stack UI)
+* **Assignee:** Gilbert (Full-Stack Frontend)
 * **Labels:** `frontend`, `milestone-day2`
 * **Description:**
   ```markdown
@@ -205,7 +205,7 @@ Add Custom Fields:
   ```
 
 #### Issue #14: [Final] NAIC Submission Portal Package Assembly
-* **Assignee:** Olusegun (Person 1)
+* **Assignee:** James (AI/ML & Backend)
 * **Labels:** `submission`, `p0-critical`, `milestone-day3`
 * **Description:**
   ```markdown

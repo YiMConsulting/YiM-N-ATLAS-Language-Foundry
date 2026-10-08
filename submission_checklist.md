@@ -12,7 +12,7 @@
 | Status | Requirement Item | Verification Criteria & Artifact Link | Owner |
 | :---: | :--- | :--- | :--- |
 | [ ] | **Working Technical Artefact** | Clean, public/evaluator Git repository containing functional pipeline, FastAPI service, and Next.js frontend. | All |
-| [ ] | **Genuine N-ATLAS Integration** | Clear code, logs, and screenshots demonstrating `NCAIR1/N-ATLaS` loading, tokenizer processing, and LoRA adaptation. | Person 1 (Olusegun) |
+| [ ] | **Genuine N-ATLAS Integration** | Clear code, logs, and screenshots demonstrating `NCAIR1/N-ATLaS` loading, tokenizer processing, and LoRA adaptation. | James (AI/ML & Backend) |
 | [ ] | **Real-World Beta Validation (PS1)** | At least **two (2) external beta testers** documented with names/roles, testing tasks, qualitative feedback, and validation logs. | James |
 | [ ] | **3–5 Minute Video Demo** | High-definition screen recording showing problem statement, Igala pipeline, adaptation run, base vs adapted comparison, and playground. | Gilbert & 3 |
 | [ ] | **Technical Documentation** | Comprehensive README, `approach.md`, architecture diagrams, API contracts, reproducibility guide. | James |
