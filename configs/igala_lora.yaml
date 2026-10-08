@@ -1,0 +1,38 @@
+# Igala LoRA Adaptation Configuration for N-ATLAS
+experiment_id: "igala-lora-v1"
+language: "Igala"
+language_code: "igl"
+base_model: "NCAIR1/N-ATLaS"
+
+# Dataset
+dataset:
+  manifest_path: "data/manifests/igala_manifest.json"
+  train_split: 0.75
+  val_split: 0.10
+  test_split: 0.15
+  seed: 42
+
+# LoRA Hyperparameters
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules: ["q_proj", "v_proj"]
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+# Training Arguments
+training:
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4
+  learning_rate: 0.0002
+  num_train_epochs: 3
+  warmup_ratio: 0.05
+  lr_scheduler_type: "cosine"
+  weight_decay: 0.01
+  logging_steps: 10
+  save_strategy: "epoch"
+  evaluation_strategy: "epoch"
+  fp16: true
+  bf16: false
+  output_dir: "./experiments/igala-v1"

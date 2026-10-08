@@ -1,0 +1,80 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv
+venv/
+ENV/
+
+# Large Model Files & Weights (Never commit weights)
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.onnx
+*.h5
+*.ckpt
+adapter_model.safetensors
+adapter_model.bin
+models/
+checkpoints/
+
+# Raw and bulky dataset files
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+outputs/examples/*
+!outputs/examples/.gitkeep
+outputs/metrics/*
+!outputs/metrics/.gitkeep
+
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+hf_token.txt
+
+# Node / Web Frontend
+node_modules/
+.next/
+out/
+build/
+.npm
+.eslintcache
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs & temp files
+*.log
+logs/
+extracted_plan.txt
+parsed_plan.md
+parse_plan.py

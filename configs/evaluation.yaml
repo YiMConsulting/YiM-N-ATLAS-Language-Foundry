@@ -1,0 +1,20 @@
+# Evaluation Benchmark Configuration
+metrics:
+  - "loss"
+  - "bleu"
+  - "chrf"
+  - "exact_match"
+
+generation:
+  max_new_tokens: 128
+  temperature: 0.1
+  top_p: 0.9
+  do_sample: false
+
+sanity_check:
+  enabled: true
+  prompts:
+    - prompt: "What is the capital of Nigeria?"
+      expected_sub: "Abuja"
+    - prompt: "Bawo ni ile?"
+      expected_language: "yo"
