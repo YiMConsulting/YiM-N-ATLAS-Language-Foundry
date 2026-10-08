@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #191f3d;
+  --surface: #ffffff;
+  --surface-muted: #f4f6fb;
+  --border: #e3e7f1;
+  --muted: #5b6386;
+  --primary: #191f3d;
+  --primary-foreground: #ffffff;
+  --accent: #2e5bff;
+  --accent-foreground: #ffffff;
+  --accent-hover: #2447cc;
+  --accent-soft: #eef2ff;
+  --sidebar: #f6f7fc;
+  --sidebar-foreground: #191f3d;
+  --sidebar-active: #e6eaff;
+}
+
+[data-theme="dark"] {
+  --background: #12182e;
+  --foreground: #ffffff;
+  --surface: #1d2445;
+  --surface-muted: #232b52;
+  --border: #2f3761;
+  --muted: #b8bfe0;
+  --primary: #191f3d;
+  --primary-foreground: #ffffff;
+  --accent: #7c93ff;
+  --accent-foreground: #12182e;
+  --accent-hover: #9bb0ff;
+  --accent-soft: #242c55;
+  --sidebar: #191f3d;
+  --sidebar-foreground: #ffffff;
+  --sidebar-active: #242c55;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-active: var(--sidebar-active);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family:
+    var(--font-geist-sans),
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
