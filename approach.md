@@ -170,3 +170,13 @@ The automated audit answers:
 
 Human review answers:
 “Are these actual language examples correct and usable?”
+
+
+### Dataset Splitting & Test-Set Isolation
+- **Splits are independent entities:** A dataset retains its canonical identity while supporting multiple deterministic splits (e.g. seed 42 vs seed 123) represented via `DatasetSplit`.
+- **Reproducibility Contract:** Ratios (`train_ratio`, `validation_ratio`, `test_ratio` summing to 1.0) and realized counts (`train_records`, `validation_records`, `test_records` summing to `total_records`) are recorded explicitly with the generator seed.
+- **Strict Test-Set Isolation:**
+  - **Train split:** Used strictly for gradient optimization / LoRA adaptation.
+  - **Validation split:** Used for hyperparameter tuning, checkpoint selection, and overfitting monitoring.
+  - **Test split:** Held-out partition evaluated only at final evaluation time for honest, unbiased comparison between unadapted base `N-ATLaS` and adapted `N-ATLaS`.
+  - Under no circumstances is test data permitted in training batches or adapter selection loops.
