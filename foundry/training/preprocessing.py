@@ -57,7 +57,36 @@ class NAtlasPreprocessor:
         input_ids = list(full_result["input_ids"])
 
         # Fail safely if this example does not have a verified prefix boundary.
+        print(f"\n[DEBUG] Record ID: {record.id}")
+        print(f"[DEBUG] Tokenizer: {type(self.tokenizer).__name__}")
+        print(f"[DEBUG] Prompt result type: {type(prompt_result).__name__}")
+        print(f"[DEBUG] Full result type: {type(full_result).__name__}")
+        print(f"[DEBUG] Prompt token count: {len(prompt_ids)}")
+        print(f"[DEBUG] Full token count: {len(input_ids)}")
+        print(
+            f"[DEBUG] Prefix matches: "
+            f"{input_ids[:len(prompt_ids)] == prompt_ids}"
+        )
         if input_ids[: len(prompt_ids)] != prompt_ids:
+            mismatch = next(
+                (
+                    i
+                    for i, (prompt_token, full_token) in enumerate(
+                        zip(prompt_ids, input_ids)
+                    )
+                    if prompt_token != full_token
+                ),
+                min(len(prompt_ids), len(input_ids)),
+            )
+            print(f"[DEBUG] First mismatch index: {mismatch}")
+            print(
+                "[DEBUG] Prompt tokens near mismatch:",
+                prompt_ids[max(0, mismatch - 5) : mismatch + 10],
+            )
+            print(
+                "[DEBUG] Full tokens near mismatch:",
+                input_ids[max(0, mismatch - 5) : mismatch + 10],
+            )
             raise ValueError(
                 "Prompt tokens are not a prefix of the full conversation. "
                 "Cannot safely construct assistant-only labels."
