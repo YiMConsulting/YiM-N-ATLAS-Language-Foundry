@@ -95,8 +95,8 @@ A cornerstone of our engineering ethics is transparent scientific reporting:
 
 | Scenario | Primary Compute | Action Plan | Fallback Trigger |
 | :--- | :--- | :--- | :--- |
-| **Tier 1 (Target)** | Kaggle NVIDIA Tesla P100 (16GB) | Full 16-bit LoRA adaptation | OOM error during forward/backward pass |
-| **Tier 2 (Fallback A)** | Google Colab T4 GPU (16GB) | 4-bit QLoRA with batch size 2, gradient accumulation 8 | Kaggle session quota or allocation delay |
+| **Tier 1 (Target / Verified)** | Kaggle 2x NVIDIA Tesla T4 (2x 15GB VRAM) | 16-bit LoRA / QLoRA adaptation with `device_map="auto"` | OOM error or quota limits |
+| **Tier 2 (Fallback A)** | Google Colab T4 GPU (15GB) | 4-bit QLoRA with batch size 2, gradient accumulation 8 | Kaggle session quota or allocation delay |
 | **Tier 3 (Fallback B)** | Local RTX GPU or CPU-mock | Mock evaluation suite & cached adapter weights | Hard failure across cloud GPU runtimes |
 
 ---
@@ -115,26 +115,30 @@ My host machine is currently running Python 3.14, while the project is targeting
 
 I also separated the project dependencies into API, development, and ML requirements. This keeps the local backend environment lightweight and avoids installing GPU/ML packages such as PyTorch, Transformers, PEFT, and bitsandbytes on the laptop.
 
-The local machine will mainly be used for backend/API development, frontend development, testing, Git, and other lightweight development tasks. The actual N-ATLaS model work and LoRA/QLoRA training will be handled in a GPU environment, with Kaggle as the primary option and Google Colab as a fallback.
+The local machine will mainly be used for backend/API development, frontend development, testing, Git, and other lightweight development tasks. The actual N-ATLaS model work and LoRA/QLoRA training will be handled in a GPU environment, with Kaggle (2x Tesla T4) as the primary verified option and Google Colab as a fallback.
 
 I verified that the Docker setup builds successfully, uses Python 3.11, loads the required API dependencies, and correctly mounts the project directories.
 
 This keeps the local development environment isolated and reproducible without requiring CUDA or an NVIDIA GPU on the development machine.
 
 
-### N-ATLaS Access and Inference Verification
+### N-ATLaS Access and Inference Verification (Empirical Baseline)
 
 Before starting the language adaptation pipeline, I verified that the N-ATLaS model can be accessed and run in the intended GPU environment.
 
-The smoke test was performed on Kaggle using Tesla T4 GPUs. PyTorch detected the GPU correctly, and Hugging Face authentication was successful.
+The smoke test was executed and verified on Kaggle (`notebooks/00_natlas_smoke_test.ipynb`) with the following actual infrastructure configuration:
 
-The `NCAIR1/N-ATLaS` model was successfully accessed and loaded through Transformers. The model was identified as a `LlamaForCausalLM` architecture, and the tokenizer loaded correctly.
+- **Compute & Accelerator:** Dual NVIDIA Tesla T4 GPUs (2x 15,360 MiB VRAM), Driver 580.178.04, CUDA 12.8 / 13.0.
+- **Software Stack:** Python 3.11 (Kaggle runtime), PyTorch `2.11.0+cu128`, Transformers `5.19.0`, PEFT `0.21.2`, Accelerate `1.15.0`, Datasets `5.1.0`, Hugging Face Hub `1.33.0`.
+- **Base Model Verification:** `NCAIR1/N-ATLaS` authenticated via Hugging Face token.
+- **Architecture Details:** `LlamaForCausalLM` (`model_type: llama`), 32 layers, hidden size 4096, 32 attention heads (with 8 KV heads for Grouped Query Attention), native `bfloat16` precision, vocab size 128,256, context window of 131,072 tokens with Llama-3 RoPE parameters.
+- **LoRA Targetable Projections:** Verified presence of `q_proj`, `k_proj`, `v_proj`, `o_proj` across all 32 transformer blocks.
+- **Inference Verification:** Prompt `"Nigeria is"` completed successfully with deterministic greedy decoding (`do_sample=False`, `max_new_tokens=30`), generating coherent base continuation.
 
-A simple inference test was also completed successfully. The model generated a response to a basic prompt, confirming that the complete path from the Kaggle GPU environment to N-ATLaS model loading and inference is working.
-
-The smoke-test notebook is saved as `notebooks/00_natlas_smoke_test.ipynb` so the environment and verification steps can be reproduced later.
+The smoke-test notebook is preserved in `notebooks/00_natlas_smoke_test.ipynb` to guarantee full end-to-end reproducibility of the environment setup.
 
 This checkpoint confirms that the project can proceed to designing the generic language and dataset contracts. No training or LoRA implementation was performed at this stage.
+
 
 
 
