@@ -242,3 +242,15 @@ The canonical record and Dataset Builder are intentionally independent of
 N-ATLaS, LoRA, QLoRA, Transformers, tokenizers, and GPU infrastructure. This
 keeps the Foundry data pipeline reusable for future Nigerian languages and
 tasks.
+
+
+### Dataset Builder Artifact Verification
+
+The Dataset Builder was verified by generating train, validation, and test
+JSONL artifacts together with split metadata. The generated records conform
+to the canonical DatasetRecord contract, the metadata counts correspond to
+the generated files, and the split uses a deterministic seed.
+
+The original source dataset remains unchanged. The processed files are treated
+as derived experiment inputs rather than replacements for the registered
+source dataset.
