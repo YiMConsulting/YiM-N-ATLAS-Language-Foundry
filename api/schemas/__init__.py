@@ -8,6 +8,16 @@ from api.schemas.dataset import (
     DatasetStatus,
 )
 from api.schemas.quality import QualityAudit, AuditStatus
+from api.schemas.experiment import (
+    Experiment,
+    ExperimentStatus,
+    AdaptationMethod,
+    AdaptationConfig,
+    TrainingConfig,
+    RuntimeConfig,
+    EvaluationMetrics,
+    ExperimentArtifacts,
+)
 
 __all__ = [
     "Language",
@@ -19,4 +29,12 @@ __all__ = [
     "DatasetStatus",
     "QualityAudit",
     "AuditStatus",
+    "Experiment",
+    "ExperimentStatus",
+    "AdaptationMethod",
+    "AdaptationConfig",
+    "TrainingConfig",
+    "RuntimeConfig",
+    "EvaluationMetrics",
+    "ExperimentArtifacts",
 ]

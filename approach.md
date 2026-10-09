@@ -199,7 +199,7 @@ inside the split schema.
   - Under no circumstances is test data permitted in training batches or adapter selection loops.
 
 
-### Checkpoint 1F — Canonical Dataset Record and Dataset Builder
+### Canonical Dataset Record and Dataset Builder
 
 The Foundry uses a model-independent canonical dataset record with four required
 fields: `id`, `input`, `target`, and `language_code`.
@@ -254,3 +254,86 @@ the generated files, and the split uses a deterministic seed.
 The original source dataset remains unchanged. The processed files are treated
 as derived experiment inputs rather than replacements for the registered
 source dataset.
+
+
+## Experiment Contract and Lifecycle
+
+### Experiment definition
+
+An experiment represents one reproducible attempt to adapt a specific
+base model for a registered language using a defined dataset composition,
+immutable dataset split, adaptation configuration, training configuration,
+and runtime configuration.
+
+The experiment is intentionally model- and language-independent. Igala is
+the first implementation language, but the experiment contract does not
+contain Igala-specific logic.
+
+### Dataset references
+
+An experiment stores `dataset_ids` and a `split_id`.
+
+Multiple registered datasets may contribute to an experiment, but the
+experiment does not combine datasets itself. Dataset composition and splitting
+are handled by the Dataset Builder before training.
+
+The resulting immutable split is referenced by `split_id`. This allows an
+experiment to reproduce the exact data used during training and evaluation.
+
+The intended flow is:
+
+```
+Dataset A + Dataset B
+        ↓
+Dataset Builder
+        ↓
+Immutable Dataset Split
+        ↓
+Experiment
+        ↓
+Adapter + Evaluation Evidence
+```
+
+This prevents training code from independently selecting or combining data
+and makes the experiment's input traceable.
+
+### Experiment lifecycle
+
+Experiments follow an explicit lifecycle:
+
+`queued → running → evaluating → completed`
+
+An experiment may enter `failed` from an active stage when execution cannot
+complete successfully.
+
+Results and adapter artifacts are therefore optional during the early
+lifecycle. A completed experiment must contain both baseline and adapted
+evaluation results.
+
+### Baseline and adapted evaluation
+
+The experiment records both `base_results` and `adapted_results`.
+
+The base model and adapted model must be evaluated using the same held-out
+test split and evaluation procedure so that the comparison measures the
+effect of adaptation rather than a difference in evaluation data.
+
+No improvement is assumed by the schema. Actual performance claims will only
+be made from recorded evaluation results.
+
+### Adaptation configuration
+
+Adaptation is represented separately from general training configuration.
+
+The MVP supports LoRA and QLoRA as adaptation methods. LoRA target modules,
+rank, alpha, and dropout are recorded explicitly so that an experiment can
+be reproduced.
+
+### Runtime configuration
+
+Hardware, device, and numerical precision are recorded as part of the
+experiment because training results depend on the execution environment.
+
+The local development environment remains separate from GPU training.
+Training experiments are expected to run on the available GPU environment,
+while local Docker is used for reproducible API and development work.
