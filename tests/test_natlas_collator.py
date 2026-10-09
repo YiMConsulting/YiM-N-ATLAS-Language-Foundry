@@ -1,6 +1,8 @@
 
 import pytest
 
+torch = pytest.importorskip("torch")
+
 from foundry.training.collator import NAtlasDataCollator
 from foundry.training.preprocessing import (
     IGNORE_INDEX,

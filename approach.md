@@ -503,8 +503,16 @@ The preprocessing and batch-collator test suites passed in the Kaggle environmen
 
 The unit tests cover sequence padding, tensor shapes and data types, preservation of prompt masking, left-padding behavior, empty-batch rejection, inconsistent sequence lengths, and missing padding-token configuration.
 
-The real-tokenizer configuration has been inspected. A real-example integration check combining preprocessing and batch collation remains a separate verification step before connecting the pipeline to LoRA/QLoRA training.
+### Checkpoint 1I.3 — Real-Tokenizer Preprocessing and Collation Integration
 
-### Next Step
-
-Is to run a real-tokenizer batch smoke test using actual Foundry dataset records. Verify that prompt labels remain masked, assistant response and end-of-turn labels remain active, padding labels are `-100`, and padded attention-mask positions are `0`. Do not begin training until this integration check passes.
+- **Status:** Passed in Kaggle.
+- **Verified:**
+  - Loaded the real `NCAIR1/N-ATLaS` tokenizer.
+  - Confirmed the existing `<|eot_id|>` token is used for padding, with token ID `128009` and right padding.
+  - Successfully preprocessed two representative Igala records.
+  - Verified that prompt tokens are excluded from the training loss and assistant response tokens are supervised.
+  - Successfully collated both examples into tensors with shape `(2, 51)`.
+  - Confirmed that the input IDs, attention mask, and labels have matching shapes and that padding labels are masked with `-100`.
+- **Implementation Note:** The preprocessor extracts `input_ids` and `attention_mask` directly from the mapping returned by `apply_chat_template(..., return_dict=True)`. The prefix assertion remains enabled to prevent unsafe assistant-only label construction.
+- **Limitations:** This checkpoint verifies preprocessing and collation only. It does not establish training convergence, model improvement, or Igala language quality.
+- **Next Checkpoint:** Connect the verified data pipeline to the N-ATLaS LoRA training configuration and validate a single forward pass before attempting training.
