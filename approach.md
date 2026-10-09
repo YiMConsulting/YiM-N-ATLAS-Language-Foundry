@@ -122,7 +122,7 @@ I verified that the Docker setup builds successfully, uses Python 3.11, loads th
 This keeps the local development environment isolated and reproducible without requiring CUDA or an NVIDIA GPU on the development machine.
 
 
-### Checkpoint 0.2 — N-ATLaS Access and Inference Verification
+### N-ATLaS Access and Inference Verification
 
 Before starting the language adaptation pipeline, I verified that the N-ATLaS model can be accessed and run in the intended GPU environment.
 
@@ -135,3 +135,34 @@ A simple inference test was also completed successfully. The model generated a r
 The smoke-test notebook is saved as `notebooks/00_natlas_smoke_test.ipynb` so the environment and verification steps can be reproduced later.
 
 This checkpoint confirms that the project can proceed to designing the generic language and dataset contracts. No training or LoRA implementation was performed at this stage.
+
+
+
+
+### Human Review
+- Human review is a validation/gating mechanism, not a permanent manual bottleneck.
+- Automated quality checks happen before human validation.
+- The Foundry does not provide or recruit reviewers in the MVP.
+- The developer can provide a qualified reviewer, such as a native speaker, linguist, or domain expert.
+- The Foundry provides the review workflow and evidence tracking, not the reviewer itself.
+- Human review is represented as:
+  Review Request → Sampled Examples → Individual Decisions → Review Summary.
+- Reviewers can mark examples:
+  - correct
+  - incorrect
+  - needs_correction
+- Corrections are preserved as review evidence rather than silently modifying the original dataset.
+- Multiple review rounds/reviewers should be possible.
+- A dataset can therefore have review history independent of any particular experiment.
+- Five developers working on the same language should be able to create separate datasets/experiments/adapters rather than automatically merging their work.
+- Adapters should be produced by experiments and evaluated independently.
+- The preferred/best adapter should be determined by evaluation evidence, not simply by being the newest adapter or using the largest dataset.
+- The Foundry's value is reproducibility, traceability, provenance, validation, and experiment management, rather than claiming that it inherently produces better fine-tuned models.
+
+Quality Audit ≠ Human Review
+
+The automated audit answers:
+“Does this dataset have obvious structural/data problems?”
+
+Human review answers:
+“Are these actual language examples correct and usable?”
