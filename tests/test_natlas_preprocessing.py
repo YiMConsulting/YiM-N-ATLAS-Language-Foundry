@@ -1,3 +1,4 @@
+from collections import UserDict
 import pytest
 from foundry.datasets.record import DatasetRecord
 from foundry.training.preprocessing import (
@@ -138,3 +139,41 @@ def test_empty_assistant_response_raises_value_error():
         ValueError, match="Full conversation contains no assistant response tokens"
     ):
         preprocessor.preprocess(make_record())
+
+
+def test_preprocessor_accepts_mapping_like_tokenizer_output():
+    class MappingTokenizer(FakeTokenizer):
+        def apply_chat_template(
+            self,
+            messages,
+            tokenize=True,
+            add_generation_prompt=False,
+            return_dict=True,
+        ):
+            result = super().apply_chat_template(
+                messages,
+                tokenize=tokenize,
+                add_generation_prompt=add_generation_prompt,
+                return_dict=return_dict,
+            )
+            return UserDict(result)
+
+    preprocessor = NAtlasPreprocessor(
+        tokenizer=MappingTokenizer(),
+        max_length=512,
+    )
+    example = preprocessor.preprocess(make_record())
+    assert example.input_ids == [
+        128000, 100, 101, 128009, 200, 201, 128009
+    ]
+    assert example.labels == [
+        IGNORE_INDEX,
+        IGNORE_INDEX,
+        IGNORE_INDEX,
+        IGNORE_INDEX,
+        200,
+        201,
+        128009,
+    ]
+    assert example.attention_mask == [1, 1, 1, 1, 1, 1, 1]
+

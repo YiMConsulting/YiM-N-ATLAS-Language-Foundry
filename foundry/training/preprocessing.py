@@ -52,16 +52,9 @@ class NAtlasPreprocessor:
             return_dict=True,
         )
 
-        prompt_ids = (
-            prompt_result["input_ids"]
-            if isinstance(prompt_result, dict)
-            else prompt_result
-        )
-        input_ids = (
-            full_result["input_ids"]
-            if isinstance(full_result, dict)
-            else full_result
-        )
+        # return_dict=True gives us a mapping containing input_ids.
+        prompt_ids = list(prompt_result["input_ids"])
+        input_ids = list(full_result["input_ids"])
 
         # Fail safely if this example does not have a verified prefix boundary.
         if input_ids[: len(prompt_ids)] != prompt_ids:
@@ -83,10 +76,7 @@ class NAtlasPreprocessor:
 
         labels = [IGNORE_INDEX] * prompt_length + list(input_ids[prompt_length:])
 
-        if isinstance(full_result, dict) and "attention_mask" in full_result:
-            attention_mask = list(full_result["attention_mask"])
-        else:
-            attention_mask = [1] * len(input_ids)
+        attention_mask = list(full_result["attention_mask"])
 
         return TokenizedTrainingExample(
             record_id=record.id,
