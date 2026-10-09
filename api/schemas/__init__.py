@@ -7,6 +7,7 @@ from api.schemas.dataset import (
     DatasetSourceType,
     DatasetStatus,
 )
+from api.schemas.quality import QualityAudit, AuditStatus
 
 __all__ = [
     "Language",
@@ -16,4 +17,6 @@ __all__ = [
     "DatasetProvenance",
     "DatasetSourceType",
     "DatasetStatus",
+    "QualityAudit",
+    "AuditStatus",
 ]
