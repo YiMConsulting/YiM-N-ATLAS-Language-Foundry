@@ -12,10 +12,10 @@
 | Status | Requirement Item | Verification Criteria & Artifact Link | Owner |
 | :---: | :--- | :--- | :--- |
 | [ ] | **Working Technical Artefact** | Clean, public/evaluator Git repository containing functional pipeline, FastAPI service, and Next.js frontend. | All |
-| [ ] | **Genuine N-ATLAS Integration** | Clear code, logs, and screenshots demonstrating `NCAIR1/N-ATLaS` loading, tokenizer processing, and LoRA adaptation. | Person 1 (Olusegun) |
-| [ ] | **Real-World Beta Validation (PS1)** | At least **two (2) external beta testers** documented with names/roles, testing tasks, qualitative feedback, and validation logs. | Person 3 |
-| [ ] | **3–5 Minute Video Demo** | High-definition screen recording showing problem statement, Igala pipeline, adaptation run, base vs adapted comparison, and playground. | Person 2 & 3 |
-| [ ] | **Technical Documentation** | Comprehensive README, `approach.md`, architecture diagrams, API contracts, reproducibility guide. | Person 3 |
+| [ ] | **Genuine N-ATLAS Integration** | Clear code, logs, and screenshots demonstrating `NCAIR1/N-ATLaS` loading, tokenizer processing, and LoRA adaptation. | James (AI/ML & Backend) |
+| [ ] | **Real-World Beta Validation (PS1)** | At least **two (2) external beta testers** documented with names/roles, testing tasks, qualitative feedback, and validation logs. | James |
+| [ ] | **3–5 Minute Video Demo** | High-definition screen recording showing problem statement, Igala pipeline, adaptation run, base vs adapted comparison, and playground. | Gilbert & 3 |
+| [ ] | **Technical Documentation** | Comprehensive README, `approach.md`, architecture diagrams, API contracts, reproducibility guide. | James |
 | [ ] | **Team Profile** | Full names, roles, contact info, affiliations, and clear breakdown of individual contributions for all 3 members. | Olusegun |
 | [ ] | **Track Endorsement / Registration** | Track A institutional endorsement letter OR Track B CAC incorporation / valid government ID. | Olusegun |
 | [ ] | **Declaration of Originality** | Formal statement affirming work was created for NAIC 2026 and not submitted or awarded elsewhere. | Olusegun |
