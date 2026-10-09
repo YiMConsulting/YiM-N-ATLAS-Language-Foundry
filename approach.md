@@ -172,9 +172,26 @@ Human review answers:
 “Are these actual language examples correct and usable?”
 
 
-### Dataset Splitting & Test-Set Isolation
-- **Splits are independent entities:** A dataset retains its canonical identity while supporting multiple deterministic splits (e.g. seed 42 vs seed 123) represented via `DatasetSplit`.
-- **Reproducibility Contract:** Ratios (`train_ratio`, `validation_ratio`, `test_ratio` summing to 1.0) and realized counts (`train_records`, `validation_records`, `test_records` summing to `total_records`) are recorded explicitly with the generator seed.
+### Dataset Split and Evaluation Isolation
+
+The dataset split is represented as a separate artifact rather than storing
+train/validation/test information directly on the dataset. This allows the
+same dataset version to support multiple reproducible split configurations.
+
+For the MVP, the split strategy is deterministic random splitting using an
+explicit seed. The split records both the configured ratios and the resulting
+record counts.
+
+The test set is treated as held-out evaluation data. It must not be used for
+training or for experiment/model-selection decisions. Base N-ATLaS and adapted
+N-ATLaS should eventually be evaluated against the same held-out test set so
+that their results can be compared fairly.
+
+The Dataset Builder will be responsible for turning usable dataset records
+into reproducible train, validation, and test sets. Quality filtering,
+human-review outcomes, duplicate handling, and leakage prevention will be
+implemented as part of the dataset-building workflow rather than being hidden
+inside the split schema.
 - **Strict Test-Set Isolation:**
   - **Train split:** Used strictly for gradient optimization / LoRA adaptation.
   - **Validation split:** Used for hyperparameter tuning, checkpoint selection, and overfitting monitoring.
