@@ -459,3 +459,52 @@ TokenizedTrainingExample
 4. **Deferred Batch Padding:**
    Individual examples are produced unpadded. Dynamic batch-level padding is deferred
    to data collation during training, maximizing GPU throughput.
+
+
+
+
+## Batch Collation and Padding
+
+### Objective
+
+Prepare variable-length tokenized training examples for batch processing while preserving assistant-only loss masking established during preprocessing.
+
+### Implementation
+
+Implemented `NAtlasDataCollator` in `foundry/training/collator.py`.
+
+The collator accepts `TokenizedTrainingExample` instances and returns PyTorch tensors for `input_ids`, `attention_mask`, and `labels`.
+
+The implementation:
+- Pads examples to the longest sequence in the batch.
+- Supports left and right padding based on the tokenizer configuration.
+- Preserves existing prompt masking and assistant-response labels.
+- Rejects empty batches, inconsistent sequence lengths, and missing padding-token configuration.
+- Assigns `-100` to padded label positions so padding does not contribute to the training loss.
+
+### N-ATLaS Padding Decision
+
+The real N-ATLaS tokenizer reports the following configuration:
+
+- Tokenizer class: `TokenizersBackend`
+- Padding token: `<|eot_id|>`
+- Padding token ID: `128009`
+- EOS token: `<|eot_id|>`
+- EOS token ID: `128009`
+- Padding side: right
+
+The existing tokenizer padding token will be reused. No additional token will be introduced, and no model embedding resize is required for padding.
+
+Because the padding token shares its ID with the end-of-turn token, token IDs alone cannot distinguish padding from genuine conversation endings. The attention mask and labels must therefore be constructed correctly: padding positions receive attention-mask value `0` and label `-100`, while genuine assistant end-of-turn tokens remain attended and supervised.
+
+### Verification
+
+The preprocessing and batch-collator test suites passed in the Kaggle environment. The reported full local API test suite also passed with 88 tests.
+
+The unit tests cover sequence padding, tensor shapes and data types, preservation of prompt masking, left-padding behavior, empty-batch rejection, inconsistent sequence lengths, and missing padding-token configuration.
+
+The real-tokenizer configuration has been inspected. A real-example integration check combining preprocessing and batch collation remains a separate verification step before connecting the pipeline to LoRA/QLoRA training.
+
+### Next Step
+
+Is to run a real-tokenizer batch smoke test using actual Foundry dataset records. Verify that prompt labels remain masked, assistant response and end-of-turn labels remain active, padding labels are `-100`, and padded attention-mask positions are `0`. Do not begin training until this integration check passes.
