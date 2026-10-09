@@ -404,3 +404,58 @@ The training input boundary was empirically validated against the official `NCAI
   - Hausa (`hau`): 43 tokens (`Good morning` → `Ina kwana`)
 
 This confirms that the N-ATLaS chat template is preserved consistently across languages without modifying the underlying canonical record.
+
+
+## Training Preprocessing & Label Construction
+
+The Foundry converts canonical dataset records into tokenized supervised
+fine-tuning examples with assistant-only loss masking:
+
+```
+Canonical DatasetRecord
+        │
+        ▼
+Apply Chat Template
+  ├─ Prompt only (with generation prompt)  → prompt_ids
+  └─ Full conversation (without gen prompt) → input_ids
+        │
+        ▼
+Prefix Integrity Check (fail-safe)
+  input_ids[:len(prompt_ids)] == prompt_ids
+        │
+        ▼
+Label Construction
+  ├─ Prompt tokens: masked with IGNORE_INDEX (-100)
+  └─ Assistant tokens: retained for loss calculation (including <|eot_id|>)
+        │
+        ▼
+Validation & Boundary Checks
+  ├─ Non-empty input & target
+  ├─ Overlength rejection (> max_length)
+  └─ Positive assistant token presence
+        │
+        ▼
+TokenizedTrainingExample
+  (record_id, language_code, input_ids, attention_mask, labels)
+```
+
+### Key Engineering Guarantees
+
+1. **Assistant-Only Loss Masking:**
+   Prompt tokens (including system headers, user turns, and formatting delimiters)
+   are assigned `IGNORE_INDEX` (`-100`). The model is penalized solely on its ability
+   to predict target language responses and appropriate turn termination (`<|eot_id|>`).
+
+2. **Prefix Boundary Verification:**
+   Before slicing labels, the preprocessor verifies that `prompt_ids` form an exact
+   prefix of `full_conversation_ids`. If tokenizer post-processing alters prefix
+   tokens, execution fails safely rather than computing loss over corrupted token offsets.
+
+3. **Overlength Rejection Policy:**
+   Examples exceeding the configured `max_length` (e.g., 512 tokens) are rejected
+   explicitly during preprocessing rather than silently truncated mid-sentence,
+   preserving sentence completeness.
+
+4. **Deferred Batch Padding:**
+   Individual examples are produced unpadded. Dynamic batch-level padding is deferred
+   to data collation during training, maximizing GPU throughput.
