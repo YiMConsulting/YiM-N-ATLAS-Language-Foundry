@@ -516,3 +516,38 @@ The unit tests cover sequence padding, tensor shapes and data types, preservatio
 - **Implementation Note:** The preprocessor extracts `input_ids` and `attention_mask` directly from the mapping returned by `apply_chat_template(..., return_dict=True)`. The prefix assertion remains enabled to prevent unsafe assistant-only label construction.
 - **Limitations:** This checkpoint verifies preprocessing and collation only. It does not establish training convergence, model improvement, or Igala language quality.
 - **Next Checkpoint:** Connect the verified data pipeline to the N-ATLaS LoRA training configuration and validate a single forward pass before attempting training.
+
+
+### Model Setup and LoRA Validation
+
+- **Status:** Passed in Kaggle.
+
+#### Model Environment
+- **Base model:** `NCAIR1/N-ATLaS`
+- **GPU:** Tesla T4, with the model distributed across the available GPU devices.
+- **Model precision:** FP16.
+- **LoRA method:** Standard LoRA, not QLoRA.
+- **Target modules:** `q_proj` and `v_proj`.
+
+#### Verified Results
+- Loaded the base model successfully.
+- Confirmed that both configured LoRA target modules exist in the model.
+- Attached LoRA adapters successfully.
+- PEFT reported 6,815,744 trainable parameters out of 8,037,076,992 total parameters (~0.0848%).
+- Processed a batch of two synthetic Igala examples with shape `(2, 51)`.
+- Completed a forward pass with a finite loss of `6.752442359924316`.
+- Completed backward propagation successfully.
+- All 128 trainable LoRA tensors had gradients; 64 had nonzero gradients for this batch.
+
+#### Implementation Notes
+- The existing experiment configuration is reused for adaptation settings.
+- The existing preprocessor and data collator supply the training batch.
+- FP16 is used for the current T4 environment.
+- QLoRA remains unsupported until a separate quantized model-loading path is implemented and tested.
+
+#### Limitations
+- This checkpoint validates model setup and gradient flow only.
+- No optimizer update or full training run has been completed.
+- The observed loss is a smoke-test result, not evidence of improved Igala language performance.
+
+**Next Checkpoint:** Implement a reproducible training runner with optimizer updates, gradient accumulation, validation, checkpoint saving, and experiment artifact tracking.
