@@ -1,6 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel, Field
+from foundry.datasets.record import DatasetRecord
 
 
 class DatasetFormat(str, Enum):

@@ -337,3 +337,70 @@ experiment because training results depend on the execution environment.
 The local development environment remains separate from GPU training.
 Training experiments are expected to run on the available GPU environment,
 while local Docker is used for reproducible API and development work.
+
+
+## N-ATLaS Training Input Boundary
+
+The Foundry keeps its canonical dataset representation independent of the
+model being adapted. A canonical `DatasetRecord` contains:
+
+- `id`
+- `input`
+- `target`
+- `language_code`
+
+N-ATLaS-specific formatting is performed in the training layer rather than
+inside the Dataset Builder.
+
+The N-ATLaS formatter converts each canonical record into a conversational
+message pair:
+
+`input → user message`
+`target → assistant message`
+
+The formatter then uses the tokenizer's registered
+`apply_chat_template()` implementation.
+
+For training, the chat template is applied with
+`add_generation_prompt=False`. Generation prompts are reserved for inference.
+
+This boundary prevents N-ATLaS-specific formatting decisions from leaking
+into the generic dataset model and allows the Foundry's canonical dataset
+representation to remain reusable across languages and future model
+adapters.
+
+The formatter does not modify the source `DatasetRecord`.
+
+The actual N-ATLaS tokenizer was verified separately in the Kaggle GPU
+environment before being used by the training pipeline.
+
+### Empirical Kaggle Formatter Smoke Test Results
+
+The training input boundary was empirically validated against the official `NCAIR1/N-ATLaS` model on Kaggle (`notebooks/01_natlas_formatter_smoke_test.ipynb`):
+
+- **Tokenizer Backend:** `TokenizersBackend` with active `chat_template` (`chat_template is not None: True`).
+- **Template Formatting:** Prepend system date markers (`Cutting Knowledge Date: December 2023`, `Today Date: 26 Jul 2024`), user header block, and assistant response block terminating with end-of-turn token `<|eot_id|>`.
+- **Sample Igala Record:**
+  - Input: `"How are you?"`
+  - Target: `"Abe ele?"`
+  - Formatted Output:
+    ```text
+    <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+    Cutting Knowledge Date: December 2023
+    Today Date: 26 Jul 2024
+
+    <|eot_id|><|start_header_id|>user<|end_header_id|>
+
+    How are you?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+    Abe ele?<|eot_id|>
+    ```
+  - Total Token Count: 45 tokens (`token_ids: [128000, 128000, 128006, 9125, 128007, ...]`).
+- **Multi-Language Generalization:**
+  - Igala (`igl`): 43 tokens (`Good morning` → `Ólódù`)
+  - Yoruba (`yor`): 45 tokens (`Good morning` → `Ẹ ku aarọ`)
+  - Igbo (`ibo`): 48 tokens (`Good morning` → `Ụtụtụ ọma`)
+  - Hausa (`hau`): 43 tokens (`Good morning` → `Ina kwana`)
+
+This confirms that the N-ATLaS chat template is preserved consistently across languages without modifying the underlying canonical record.
