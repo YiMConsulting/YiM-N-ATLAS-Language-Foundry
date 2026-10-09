@@ -9,6 +9,7 @@ requests
 # Data processing
 pandas
 numpy
+pyarrow
 scikit-learn
 
 # Testing

@@ -197,3 +197,48 @@ inside the split schema.
   - **Validation split:** Used for hyperparameter tuning, checkpoint selection, and overfitting monitoring.
   - **Test split:** Held-out partition evaluated only at final evaluation time for honest, unbiased comparison between unadapted base `N-ATLaS` and adapted `N-ATLaS`.
   - Under no circumstances is test data permitted in training batches or adapter selection loops.
+
+
+### Checkpoint 1F — Canonical Dataset Record and Dataset Builder
+
+The Foundry uses a model-independent canonical dataset record with four required
+fields: `id`, `input`, `target`, and `language_code`.
+
+Source datasets may arrive as JSON, JSONL, CSV, or Parquet. The Dataset Builder
+normalizes these formats into the canonical record representation before
+downstream processing. The original source format remains a data-ingestion
+concern and is not required by downstream components.
+
+Dataset-level provenance remains separate from individual records. The
+canonical record does not duplicate source, license, or retrieval metadata.
+
+N-ATLaS-specific formatting, tokenization, and chat-template handling are also
+kept outside the canonical data layer. These concerns belong to the model
+training/inference layer.
+
+The Dataset Builder performs the following steps:
+
+1. Load the registered dataset.
+2. Normalize records into the canonical schema.
+3. Exclude malformed records and records belonging to a different language.
+4. Remove exact duplicate records and duplicate record IDs.
+5. Deterministically shuffle records using an explicit seed.
+6. Create train, validation, and held-out test splits.
+7. Write processed datasets as JSONL.
+8. Write split metadata containing the seed, ratios, and resulting record counts.
+
+The builder does not modify the original dataset. Processed datasets are
+derived artifacts stored separately.
+
+For the MVP, duplicate detection is exact rather than fuzzy. This avoids
+incorrectly removing legitimate language examples based on aggressive or
+language-specific normalization.
+
+The test set remains held out from training and experiment/model-selection
+decisions. Base N-ATLaS and adapted N-ATLaS will later use the same held-out
+test set for fair comparison.
+
+The canonical record and Dataset Builder are intentionally independent of
+N-ATLaS, LoRA, QLoRA, Transformers, tokenizers, and GPU infrastructure. This
+keeps the Foundry data pipeline reusable for future Nigerian languages and
+tasks.
