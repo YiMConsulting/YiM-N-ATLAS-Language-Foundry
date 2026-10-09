@@ -877,8 +877,7 @@ Python module names.
 
 ## 9. Decisions to finalize
 
-These do not all block frontend work, but should be settled before
-relevant routes are marked implemented:
+
 
 1.  Persistence: SQLite or another store; behavior across API restarts.
 2.  Ingestion transport: JSON record batches versus multipart file
