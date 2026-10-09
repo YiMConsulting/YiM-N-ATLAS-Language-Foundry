@@ -8,6 +8,7 @@ from foundry.training.preprocessing import (
     NAtlasPreprocessor,
     TokenizedTrainingExample,
 )
+from foundry.training.model_setup import attach_lora_adapters
 
 __all__ = [
     "FormattedTrainingExample",
@@ -15,4 +16,5 @@ __all__ = [
     "IGNORE_INDEX",
     "NAtlasPreprocessor",
     "TokenizedTrainingExample",
+    "attach_lora_adapters",
 ]
