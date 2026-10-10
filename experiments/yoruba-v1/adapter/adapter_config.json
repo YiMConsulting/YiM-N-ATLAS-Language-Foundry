@@ -1,0 +1,20 @@
+{
+  "base_model_name_or_path": "NCAIR1/N-ATLaS",
+  "language_code": "yor",
+  "peft_type": "LORA",
+  "r": 16,
+  "lora_alpha": 32,
+  "lora_dropout": 0.05,
+  "target_modules": [
+    "q_proj",
+    "v_proj"
+  ],
+  "bias": "none",
+  "task_type": "CAUSAL_LM",
+  "training_metadata": {
+    "dataset_rows": 10,
+    "epochs": 3,
+    "learning_rate": 0.0002,
+    "hardware": "Dual Tesla T4 (2x15GB) / RTX 4090"
+  }
+}

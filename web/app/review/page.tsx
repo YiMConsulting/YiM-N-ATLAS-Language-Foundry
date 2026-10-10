@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/components/coming-soon";
+import { ReviewPortal } from "@/components/ReviewPortal";
 
 export const metadata: Metadata = {
-  title: "Review | N-ATLAS Language Foundry",
+  title: "Human Review | N-ATLAS Language Foundry",
+  description: "Native speaker linguistic audit and verification gate for Igala (igl).",
 };
 
 export default function ReviewPage() {
-  return <ComingSoon title="Review" />;
+  return <ReviewPortal />;
 }

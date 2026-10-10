@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { Select } from "@/components/ui/select";
 import { languages } from "@/lib/languages";
+import { useLanguage } from "@/components/layout/language-provider";
 
 export function LanguageSelector() {
-  const [selected, setSelected] = useState(languages[0]?.language_code ?? "");
+  const { activeLanguage, setActiveLanguageByCode } = useLanguage();
 
   return (
     <div className="w-32">
@@ -14,8 +14,8 @@ export function LanguageSelector() {
           value: language.language_code,
           label: language.name,
         }))}
-        value={selected}
-        onChange={setSelected}
+        value={activeLanguage.language_code}
+        onChange={setActiveLanguageByCode}
         ariaLabel="Select language"
       />
     </div>
