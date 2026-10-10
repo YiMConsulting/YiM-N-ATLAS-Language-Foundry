@@ -5,6 +5,24 @@
 
 ---
 
+## 🔗 Quick Access & Demo Links
+
+Testers and developers can access the live system through the following demo links:
+
+* **Live Review Portal Demo:** [http://localhost:3000/review](http://localhost:3000/review)
+  * *Standalone fallback preview:* Open [`web/review_preview.html`](../web/review_preview.html) directly in any modern browser.
+* **Main Foundry Web Dashboard:** [http://localhost:3000](http://localhost:3000)
+  * *Languages Registry:* [http://localhost:3000/languages](http://localhost:3000/languages)
+  * *Datasets & Ingestion:* [http://localhost:3000/datasets](http://localhost:3000/datasets)
+  * *Experiments & Training:* [http://localhost:3000/experiments](http://localhost:3000/experiments)
+  * *Interactive Playground:* [http://localhost:3000/playground](http://localhost:3000/playground)
+* **Evidence & Provenance Hub:** [http://localhost:3000/evidence](http://localhost:3000/evidence)
+* **FastAPI Backend (Live Control Plane):** [http://localhost:8000](http://localhost:8000)
+* **Interactive API Documentation (Swagger UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
+* **Official GitHub Repository:** [https://github.com/YiMConsulting/YiM-N-ATLAS-Language-Foundry](https://github.com/YiMConsulting/YiM-N-ATLAS-Language-Foundry)
+
+---
+
 ## 📋 Evaluation Overview
 
 * **Laboratory Language:** Igala (`igl`)
@@ -36,41 +54,43 @@
 ---
 
 ### Task 2: Linguistic Audit & Review Portal Evaluation (10 mins)
-1. Open the **Igala Review Portal** (in web dashboard or `web/review_preview.html`).
-2. Inspect the bilingual card pairs (English source ↔ Igala candidate).
-3. Evaluate 3–5 samples:
+1. Open the **Igala Review Portal** at [http://localhost:3000/review](http://localhost:3000/review) (or `web/review_preview.html`).
+2. Observe the **"Live FastAPI Connected (:8000)"** green status badge confirming live synchronization with James's backend endpoints.
+3. Inspect the bilingual card pairs (English source ↔ Igala candidate).
+4. Evaluate 3–5 samples:
    - Try the **Approved**, **Needs Correction**, and **Rejected** buttons.
-   - Use the **Igala Diacritic Toolbar** (`ẹ`, `ọ`, `ñ`, `á`, `à`, etc.) to tweak a sentence.
-   - Verify that the progress bar and approval percentage update live.
-4. Click **"Submit Audit Batch"** and inspect the JSON payload.
-5. **Question to Answer:** Does the diacritic toolbar and review flow make it easy for an indigenous language expert to audit data without specialized software?
+   - Use the **Igala Diacritic Toolbar** (`ẹ`, `ọ`, `ñ`, `á`, `à`, etc.) to tweak an orthographic sentence.
+   - Verify that the progress bar, statistics badges, and approval percentage update live.
+5. Click **"Submit Audit Batch"** and inspect the returned response payload confirming persistence.
+6. **Question to Answer:** Does the diacritic toolbar and review flow make it easy for an indigenous language expert to audit data without specialized software?
 
 ---
 
 ### Task 3: API & CLI Pipeline Execution (10 mins)
 1. Start the backend API:
    ```powershell
-   uvicorn api.main:app --reload
+   uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
    ```
-2. Open Swagger Docs at `http://localhost:8000/docs`.
-3. Execute the `GET /api/languages` and `GET /api/experiments/igala-lora-v1` endpoints.
-4. Run the automated test suite:
+2. Open Swagger Docs at [http://localhost:8000/docs](http://localhost:8000/docs).
+3. Execute the `GET /api/v1/languages` and `GET /api/v1/experiments/exp-igl-lora-v1` endpoints.
+4. Test review submission endpoint: `POST /api/v1/review/submit` or `POST /review/decisions`.
+5. Run the automated test suite:
    ```powershell
    pytest tests/
    ```
-5. **Question to Answer:** Did the endpoints respond as described in the API contract? Were any errors encountered during test execution?
+6. **Question to Answer:** Did the endpoints respond as described in the API contract? Were all tests passing?
 
 ---
 
 ### Task 4: Base vs. Adapted Model Quality Comparison (5 mins)
-1. Inspect the comparative outputs in `experiments/igala-v1/results.json` or on the dashboard.
+1. Open the **Results & Experiments** dashboard at [http://localhost:3000/experiments](http://localhost:3000/experiments).
 2. Compare the output of the unmodified `NCAIR1/N-ATLaS` baseline versus the LoRA-adapted model on 3 test prompts.
 3. **Question to Answer:** Did the LoRA-adapted model produce more grammatically natural Igala translations and better tone markings?
 
 ---
 
 ### Task 5: Interactive Playground (5 mins)
-1. In the Web UI or via `POST /api/playground/generate`, submit a custom English prompt (e.g., *"Welcome to our home"* or *"Water brings life"*).
+1. In the Web UI at [http://localhost:3000/playground](http://localhost:3000/playground) or via `POST /api/v1/playground/generate`, submit a custom English prompt (e.g., *"Welcome to our home"* or *"Water brings life"*).
 2. Observe latency and generated Igala text.
 3. **Question to Answer:** How intuitive is the playground for developers seeking to test the model on their custom inputs?
 
