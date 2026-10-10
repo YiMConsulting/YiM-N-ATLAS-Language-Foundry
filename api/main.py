@@ -230,6 +230,36 @@ SAMPLE_ITEMS: list[dict[str, Any]] = [
         "flagged_reason": "Grammatical harmony for folk tale characters",
         "sampled_at": NOW.isoformat(),
     },
+    {
+        "id": "sample-yor-001",
+        "review_request_id": "rev_req_yor_001",
+        "record_id": "rec-yor-001",
+        "input_text": "Good morning, how did you sleep?",
+        "expected_text": "Ẹ kárọ̀ o, ṣé ẹ sùn dáadáa?",
+        "context": "Daily greetings & courtesy",
+        "flagged_reason": "Tone markings verification",
+        "sampled_at": NOW.isoformat(),
+    },
+    {
+        "id": "sample-yor-002",
+        "review_request_id": "rev_req_yor_001",
+        "record_id": "rec-yor-002",
+        "input_text": "Water is essential for life, let us preserve our rivers.",
+        "expected_text": "Omi ṣe pàtàkì fún ẹ̀mí, ẹ jẹ́ ká dáàbò bo odò wa.",
+        "context": "General knowledge & biology",
+        "flagged_reason": "Verify diacritics on 'ẹ̀mí'",
+        "sampled_at": NOW.isoformat(),
+    },
+    {
+        "id": "sample-yor-003",
+        "review_request_id": "rev_req_yor_001",
+        "record_id": "rec-yor-003",
+        "input_text": "Welcome to our home, feel at peace.",
+        "expected_text": "Ẹ káàbọ̀ sí ilé wa, ẹ fọkàn balẹ̀.",
+        "context": "Hospitality & welcoming phrases",
+        "flagged_reason": "Potential dialectal variation",
+        "sampled_at": NOW.isoformat(),
+    }
 ]
 
 REVIEW_DECISIONS: dict[str, dict[str, Any]] = {}

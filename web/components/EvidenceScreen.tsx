@@ -2,6 +2,7 @@
 
 import React from "react";
 import { CheckIcon } from "@/components/icons";
+import { useLanguage } from "@/components/layout/language-provider";
 
 export interface EvidenceRecord {
   experimentId: string;
@@ -36,36 +37,61 @@ export interface EvidenceRecord {
   completedAt: string;
 }
 
-const DEFAULT_EVIDENCE: EvidenceRecord = {
-  experimentId: "exp-igl-lora-v1",
-  language: "Igala",
-  languageCode: "igl",
-  baseModel: "meta-llama/Llama-3.1-8B-Instruct",
-  datasetId: "igl-parallel-v1",
-  datasetLicense: "CC-BY-4.0 (Commercial & Research Allowed)",
-  manifestSha: "sha256:d8a9f3b18c0e29d71c4fa4891bca7f9184b2c451",
-  totalRecords: 4850,
-  cleanRecords: 4820,
-  duplicatesRemoved: 18,
-  malformedRemoved: 12,
-  humanReviewApproved: 28,
-  humanReviewTotal: 30,
-  humanReviewPassPct: 93.3,
-  hardware: "NVIDIA RTX 4090 (24GB VRAM, 4-bit QLoRA)",
-  adapterMethod: "PEFT LoRA (Target modules: q_proj, v_proj)",
-  loraRank: 16,
-  loraAlpha: 32,
-  baseMetrics: { loss: 3.84, bleu: 8.2, chrf: 24.5 },
-  adaptedMetrics: { loss: 1.28, bleu: 29.6, chrf: 52.7 },
-  gitCommit: "750348b",
-  completedAt: "2026-10-10T16:45:00Z",
+const EVIDENCES: Record<string, EvidenceRecord> = {
+  igl: {
+    experimentId: "exp-igl-lora-v1",
+    language: "Igala",
+    languageCode: "igl",
+    baseModel: "meta-llama/Llama-3.1-8B-Instruct",
+    datasetId: "igl-parallel-v1",
+    datasetLicense: "CC-BY-4.0 (Commercial & Research Allowed)",
+    manifestSha: "sha256:d8a9f3b18c0e29d71c4fa4891bca7f9184b2c451",
+    totalRecords: 4850,
+    cleanRecords: 4820,
+    duplicatesRemoved: 18,
+    malformedRemoved: 12,
+    humanReviewApproved: 28,
+    humanReviewTotal: 30,
+    humanReviewPassPct: 93.3,
+    hardware: "NVIDIA RTX 4090 (24GB VRAM, 4-bit QLoRA)",
+    adapterMethod: "PEFT LoRA (Target modules: q_proj, v_proj)",
+    loraRank: 16,
+    loraAlpha: 32,
+    baseMetrics: { loss: 3.84, bleu: 8.2, chrf: 24.5 },
+    adaptedMetrics: { loss: 1.28, bleu: 29.6, chrf: 52.7 },
+    gitCommit: "750348b",
+    completedAt: "2026-10-10T16:45:00Z",
+  },
+  yor: {
+    experimentId: "exp-yor-lora-v1",
+    language: "Yoruba",
+    languageCode: "yor",
+    baseModel: "meta-llama/Llama-3.1-8B-Instruct",
+    datasetId: "yor-parallel-v1",
+    datasetLicense: "CC-BY-4.0 (Commercial & Research Allowed)",
+    manifestSha: "sha256:f1c5d3b18c0e29d71c4fa4891bca7f9184b2c789",
+    totalRecords: 12160,
+    cleanRecords: 12050,
+    duplicatesRemoved: 60,
+    malformedRemoved: 50,
+    humanReviewApproved: 45,
+    humanReviewTotal: 50,
+    humanReviewPassPct: 90.0,
+    hardware: "Dual Tesla T4 (2x15GB, 4-bit QLoRA)",
+    adapterMethod: "PEFT LoRA (Target modules: q_proj, v_proj)",
+    loraRank: 16,
+    loraAlpha: 32,
+    baseMetrics: { loss: 4.12, bleu: 11.2, chrf: 22.4 },
+    adaptedMetrics: { loss: 1.16, bleu: 35.8, chrf: 59.1 },
+    gitCommit: "66b02f0",
+    completedAt: "2026-10-10T08:00:00Z",
+  }
 };
 
-export function EvidenceScreen({
-  record = DEFAULT_EVIDENCE,
-}: {
-  record?: EvidenceRecord;
-}) {
+export function EvidenceScreen() {
+  const { activeLanguage } = useLanguage();
+  const record = EVIDENCES[activeLanguage.language_code] || EVIDENCES["igl"];
+
   const bleuDiff = ((record.adaptedMetrics.bleu - record.baseMetrics.bleu) / record.baseMetrics.bleu) * 100;
   const chrfDiff = record.adaptedMetrics.chrf - record.baseMetrics.chrf;
   const lossDiff = ((record.baseMetrics.loss - record.adaptedMetrics.loss) / record.baseMetrics.loss) * 100;

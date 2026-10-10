@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppShell } from "@/components/layout/app-shell";
-import {  AppToaster } from "@/components/layout/app-toaster";
+import { AppToaster } from "@/components/layout/app-toaster";
 import { ThemeProvider } from "@/components/layout/theme-provider";
+import { LanguageProvider } from "@/components/layout/language-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
     "Developer infrastructure for adapting N-ATLAS to underserved Nigerian languages.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
@@ -38,8 +39,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full">
         <ThemeProvider>
-          <AppShell>{children}</AppShell>
-          <AppToaster />
+          <LanguageProvider>
+            <AppShell>{children}</AppShell>
+            <AppToaster />
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

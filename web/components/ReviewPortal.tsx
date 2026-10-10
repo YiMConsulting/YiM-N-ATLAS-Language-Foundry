@@ -10,19 +10,23 @@ import type {
   ReviewItemDecision,
   ReviewSubmissionPayload,
 } from "./types";
+import { useLanguage } from "@/components/layout/language-provider";
 
-const IGALA_SPECIAL_CHARS = ["ẹ", "ọ", "ñ", "ch", "gb", "kp", "kw", "gw", "́", "̀", "̄"];
+const SPECIAL_CHARS: Record<string, string[]> = {
+  igl: ["ẹ", "ọ", "ñ", "ch", "gb", "kp", "kw", "gw", "́", "̀", "̄"],
+  yor: ["ẹ", "ọ", "ṣ", "́", "̀", "̄"],
+};
 
 // Standard endpoints
 const BACKEND_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
 
 export function ReviewPortal({
   initialSamples = MOCK_IGALA_SAMPLES,
-  datasetId = "igl-parallel-v1",
 }: {
   initialSamples?: ReviewSample[];
-  datasetId?: string;
 }) {
+  const { activeLanguage } = useLanguage();
+  const datasetId = `${activeLanguage.language_code}-parallel-v1`;
   const [samples, setSamples] = useState<ReviewSample[]>(initialSamples);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [reviewerId, setReviewerId] = useState("olusegun-linguist");
@@ -34,9 +38,10 @@ export function ReviewPortal({
 
   // Fetch real samples from James's FastAPI endpoint on mount
   const fetchLiveSamples = useCallback(async () => {
+    const langCode = activeLanguage.language_code;
     try {
       // 1. Try James's FastAPI backend first
-      const fastApiUrl = `${BACKEND_BASE}/review/requests/rev_req_igl_001/samples`;
+      const fastApiUrl = `${BACKEND_BASE}/review/requests/rev_req_${langCode}_001/samples`;
       setActiveEndpointUrl(fastApiUrl);
       const res = await fetch(fastApiUrl, { cache: "no-store" });
       
@@ -83,10 +88,15 @@ export function ReviewPortal({
 
     setIsConnectedToBackend(false);
     setActiveEndpointUrl("local-cache");
-  }, []);
+  }, [activeLanguage.language_code]);
 
   useEffect(() => {
     fetchLiveSamples();
+    // Reset state when language changes
+    setSamples([]);
+    setCurrentIndex(0);
+    setDecisions({});
+    setSubmittedPayload(null);
   }, [fetchLiveSamples]);
 
   const currentSample = samples[currentIndex];
@@ -131,7 +141,7 @@ export function ReviewPortal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          review_request_id: "rev_req_igl_001",
+          review_request_id: `rev_req_${activeLanguage.language_code}_001`,
           sample_item_id: currentSample.sample_id,
           decision,
           reviewer_id: reviewerId,
@@ -238,7 +248,7 @@ export function ReviewPortal({
             )}
           </div>
           <p className="mt-1 text-sm text-muted">
-            Native speaker orthography audit and verification gate for Igala (igl).
+            Native speaker orthography audit and verification gate for {activeLanguage.name} ({activeLanguage.language_code}).
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -340,7 +350,7 @@ export function ReviewPortal({
 
             <div className="rounded-lg border border-accent/30 bg-accent-soft p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-accent">
-                Target Translation (Igala)
+                Target Translation ({activeLanguage.name})
               </p>
               <p className="mt-2 text-base font-semibold text-foreground">
                 {currentSample.target_text}
@@ -397,13 +407,13 @@ export function ReviewPortal({
             <div className="mt-5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                  Igala Orthography & Tone Diacritics Toolbar
+                  {activeLanguage.name} Orthography & Tone Diacritics Toolbar
                 </p>
                 <span className="text-xs text-muted">Click diacritic to insert</span>
               </div>
 
               <div className="mt-2.5 flex flex-wrap gap-1.5">
-                {IGALA_SPECIAL_CHARS.map((char) => (
+                {(SPECIAL_CHARS[activeLanguage.language_code] || []).map((char) => (
                   <button
                     key={char}
                     type="button"
@@ -419,7 +429,7 @@ export function ReviewPortal({
                 type="text"
                 value={currentDecision.suggested_correction || ""}
                 onChange={(e) => updateDecisionDetails({ suggested_correction: e.target.value })}
-                placeholder="Corrected Igala sentence with tones..."
+                placeholder={`Corrected ${activeLanguage.name} sentence with tones...`}
                 className="mt-3 w-full rounded-md border border-border bg-surface p-2.5 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
               />
             </div>
