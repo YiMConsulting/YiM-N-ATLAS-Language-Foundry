@@ -101,9 +101,6 @@ export function EvidenceScreen() {
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-accent mb-2">
-            <span>Section 11: Reproducibility & Evidence Dossier</span>
-          </div>
           <h2 className="text-2xl font-semibold tracking-tight">
             Verification Evidence: {record.language} ({record.languageCode})
           </h2>
@@ -111,11 +108,6 @@ export function EvidenceScreen() {
             Immutable provenance, automated quality audit, and human validation gate record.
           </p>
         </div>
-
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 self-start sm:self-auto">
-          <CheckIcon className="h-3.5 w-3.5" />
-          Section 11 Compliant
-        </span>
       </div>
 
       {/* 3 Evidence Cards Grid */}
