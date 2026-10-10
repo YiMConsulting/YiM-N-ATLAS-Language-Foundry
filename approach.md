@@ -551,3 +551,150 @@ The unit tests cover sequence padding, tensor shapes and data types, preservatio
 - The observed loss is a smoke-test result, not evidence of improved Igala language performance.
 
 **Next Checkpoint:** Implement a reproducible training runner with optimizer updates, gradient accumulation, validation, checkpoint saving, and experiment artifact tracking.
+
+
+
+## Training Runner and Optimization Pipeline
+
+### Objective
+
+The training runner connects the verified preprocessing, batch collation, and LoRA model setup components into a reusable training workflow. It is responsible for optimizer updates, gradient accumulation, validation-loss evaluation, and saving training artifacts.
+
+The runner is implemented in `foundry/training/runner.py`, with its focused tests in `tests/test_natlas_training_runner.py`.
+
+### Training Workflow
+
+The runner follows this sequence:
+
+1. Validate the training configuration and dataloader requirements.
+2. Initialize reproducible training seeds.
+3. Configure the optimizer and learning-rate scheduler.
+4. Stream training batches without materializing the entire dataloader in memory.
+5. Compute supervised-token-weighted training loss.
+6. Accumulate gradients and perform optimizer updates, including when the final accumulation group contains fewer batches than the configured accumulation steps.
+7. Apply linear learning-rate warmup according to the configured `warmup_ratio`.
+8. Evaluate validation loss without updating model parameters.
+9. Save the training configuration, training metrics, and best adapter checkpoint.
+
+The training and validation dataloaders must be sized and re-iterable. Empty dataloaders and batches without supervised labels are rejected explicitly rather than silently producing misleading metrics.
+
+### Loss Calculation and Validation
+
+Training and validation losses are weighted by the number of supervised tokens. This avoids treating batches with different numbers of supervised tokens as if they contributed equally to the overall loss.
+
+Validation is intended to measure model performance without changing the model's parameters or existing gradients. The evaluation implementation also preserves the model's original training/evaluation mode.
+
+These safeguards support reliable training metrics and help prevent accidental interference with the optimization process.
+
+### Training Artifacts and Adapter Loading
+
+The runner saves the following artifacts:
+
+- `training_config.json` — the training configuration used for the run.
+- `training_metrics.json` — the recorded training and validation metrics.
+- `best_adapter/` — the saved best adapter checkpoint, written through the PEFT adapter-saving interface.
+
+A corresponding adapter-loading function is provided so a saved PEFT adapter can be loaded for subsequent evaluation or inference.
+
+These artifacts form the initial training-run output. They do not yet represent a complete experiment-tracking service or a verified improvement over the unadapted base model.
+
+### Verification and Test Evidence
+
+The training runner passed its focused unit-test suite, related regression tests, and the full backend test suite in the Docker-based ML test environment.
+
+Reported results:
+
+- Training runner tests: **7 passed**.
+- Related regression tests: **25 passed**.
+- Full backend test suite: **104 passed**.
+
+The tests cover parameter updates, artifact creation, streaming dataloader behavior, validation safeguards, empty dataloader rejection, one-shot generator rejection, and batches without supervised labels.
+
+The full backend test result provides evidence that the new runner remains compatible with the existing backend schemas, dataset utilities, and training components covered by the suite.
+
+### Current Limitations
+
+This checkpoint establishes the training runner's tested implementation, not the completion of a real N-ATLaS fine-tuning run.
+
+The following remain to be verified in the GPU environment:
+
+- Running optimizer updates on the actual N-ATLaS model using real prepared training data.
+- Completing a training run with validation and checkpoint selection.
+- Loading the saved adapter and comparing the adapted model against the unadapted base model on the same held-out test split.
+- Recording final evaluation metrics and determining whether adaptation improves performance on the target language.
+
+The existing LoRA GPU smoke test remains evidence of successful model setup and gradient flow, not evidence of completed training or improved Igala language quality.
+
+**Checkpoint status:** Training runner implementation and automated tests passed. Real-model training and comparative evaluation remain pending.
+
+**Next checkpoint:** Validate the runner against the real N-ATLaS model and prepared dataset in Kaggle, beginning with a controlled training run before attempting a larger experiment.
+
+
+
+
+## Initial Language Experiment: Tiv
+
+N-ATLAS Language Foundry is designed to support adaptation across Nigerian languages, rather than being tied to a single language.
+
+Igala was initially selected as the first experimental language. However, during data exploration, obtaining an accessible corpus suitable for the intended training and evaluation workflow proved difficult. We therefore shifted the initial experiment to Tiv after identifying candidate English–Tiv parallel data sources.
+
+This is a practical change to the first experiment, not a change in the Foundry's architecture or long-term scope.
+
+The Tiv pilot will help validate the complete workflow: dataset discovery, provenance tracking, automated quality auditing, human review, reproducible splitting, model adaptation, and baseline-versus-adapted evaluation. The resulting workflow should then be reusable for Igala and other Nigerian languages when suitable data becomes available.
+
+The identified Tiv datasets remain candidates until their provenance, licensing, quality, and suitability for the experiment have been reviewed.
+
+
+
+## Current Project Direction and Language Selection
+
+### Foundry Objective
+
+N-ATLaS Language Foundry is intended to provide a reusable, auditable workflow for adapting N-ATLaS to additional Nigerian languages. Its purpose is to make dataset preparation, quality control, human review, experiment management, training, and evaluation repeatable across languages.
+
+The Foundry is not intended to be a separate foundation model. Its value lies in the infrastructure and evidence surrounding adaptation: traceable data, reproducible experiments, comparable evaluations, and independently tracked adapters.
+
+### Change from Igala to Tiv
+
+Igala was the initial laboratory language considered during project planning. However, access to the researched Igala dataset corpus could not be obtained. The project therefore changed its initial adaptation experiment to Tiv, for which accessible candidate data sources were identified.
+
+This is a change in the pilot language, not in the Foundry's general architecture. The canonical dataset schema, quality auditing, human-review workflow, dataset builder, experiment contracts, and training pipeline must remain reusable across languages.
+
+The Tiv pilot currently considers two independent sources:
+
+- MT560: an English–Tiv parallel corpus.
+- Hypa Text-10k: a multilingual instruction dataset from which explicit English-to-Tiv candidates were extracted.
+
+The sources remain separate while provenance, licensing, structural quality, and translation accuracy are assessed. The recorded dataset revisions and declared licenses are preliminary provenance evidence, not a substitute for reviewing the actual license terms and source conditions.
+
+### Current Data and Review Status
+
+The initial structural audit found:
+
+- MT560: 184,113 loaded records, 391 exact duplicate pairs, and 3,116 repeated English inputs.
+- Hypa Text-10k: 103 explicit English-to-Tiv candidates, with six records flagged by the current heuristic review checks.
+
+Repeated English inputs are not automatically invalid. They may have different legitimate translations or occur in different contexts. Structural flags therefore identify records or groups requiring further inspection; they do not, by themselves, establish translation errors.
+
+Human reviewers will assess translation accuracy, meaning completeness, Tiv naturalness, and formatting. Review decisions must remain separate from the original source records.
+
+### Dataset Split Strategy Update
+
+The Dataset Builder supports two split strategies:
+
+- `random`: deterministic random splitting, retained as the default for backward compatibility.
+- `grouped_by_input`: deterministic splitting that keeps records with the same normalized input in one partition.
+
+The grouped strategy normalizes input text by collapsing whitespace, trimming surrounding whitespace, and applying case folding. It then assigns whole groups to partitions using a deterministic heuristic that minimizes incremental squared deviation from the target partition sizes.
+
+Grouped splitting may produce approximate rather than exact 75/10/15 proportions because groups must remain intact. It prevents normalized exact-input variants from crossing partitions, but does not detect semantic duplicates or all possible forms of data leakage.
+
+Automated regression tests cover the grouped behavior, and the full backend suite has passed 105 tests. These results validate the tested software behavior; they do not establish linguistic quality or successful model adaptation.
+
+### Immediate Next Milestones
+
+1. Complete and review the documentation for the current data and splitting workflow.
+2. Add integration tests covering the complete dataset preparation path and verify that source identity and split isolation are preserved.
+3. Prepare a provisional MT560-only training experiment in Kaggle, keeping Hypa separate.
+4. Evaluate the unadapted base model and adapted model using the same held-out test partition.
+5. Incorporate qualified human-review findings before making final claims about dataset eligibility or translation quality.
