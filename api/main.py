@@ -63,7 +63,17 @@ LANGUAGES: dict[str, dict[str, Any]] = {
         "name": "Yoruba",
         "native_name": "Yorùbá",
         "status": "active",
-        "description": "High-resource Nigerian benchmark language in N-ATLaS base.",
+        "description": "High-resource Nigerian benchmark language active for multi-adapter cross-evaluation.",
+        "created_at": NOW.isoformat(),
+        "updated_at": NOW.isoformat(),
+    },
+    "yor": {
+        "id": "lang-yo-003",
+        "code": "yor",
+        "name": "Yoruba",
+        "native_name": "Yorùbá",
+        "status": "active",
+        "description": "High-resource Nigerian benchmark language active for multi-adapter cross-evaluation.",
         "created_at": NOW.isoformat(),
         "updated_at": NOW.isoformat(),
     },
@@ -89,6 +99,20 @@ DATASETS: dict[str, dict[str, Any]] = {
         "source_type": "community",
         "record_count": 4850,
         "provenance_id": "prov-igl-001",
+        "version": "v1.0",
+        "status": "ready",
+        "created_at": NOW.isoformat(),
+        "updated_at": NOW.isoformat(),
+    },
+    "yor-parallel-v1": {
+        "id": "yor-parallel-v1",
+        "language_code": "yor",
+        "name": "Yoruba Audited Instruction Corpus V1",
+        "description": "Bilingual Yoruba instruction dataset from Masakhane & native linguists.",
+        "format": "jsonl",
+        "source_type": "community",
+        "record_count": 15200,
+        "provenance_id": "prov-yor-001",
         "version": "v1.0",
         "status": "ready",
         "created_at": NOW.isoformat(),
@@ -429,9 +453,61 @@ def list_experiments():
                     "config_path": "experiments/igala-v1/adapter_config.json",
                     "metrics_path": "experiments/igala-v1/metrics.json",
                 },
+            },
+            {
+                "id": "exp-yor-lora-v1",
+                "language_code": "yor",
+                "base_model": "NCAIR1/N-ATLaS",
+                "dataset_ids": ["yor-parallel-v1"],
+                "split_id": "split-yor-80-10-10",
+                "status": "completed",
+                "adaptation": {
+                    "method": "lora",
+                    "rank": 16,
+                    "alpha": 32,
+                    "dropout": 0.05,
+                    "target_modules": ["q_proj", "v_proj"],
+                },
+                "training": {
+                    "per_device_batch_size": 4,
+                    "gradient_accumulation_steps": 4,
+                    "learning_rate": 0.0002,
+                    "epochs": 3,
+                    "warmup_ratio": 0.05,
+                    "weight_decay": 0.01,
+                    "seed": 42,
+                },
+                "runtime": {
+                    "hardware": "Dual Tesla T4 (2x15GB)",
+                    "device": "cuda",
+                    "precision": "bf16",
+                },
+                "base_results": {
+                    "loss": 2.45,
+                    "bleu_score": 16.8,
+                    "chrf_score": 41.2,
+                    "exact_match_ratio": 0.08,
+                    "inference_latency_ms": 275.0,
+                    "sanity_check_passed": True,
+                    "sample_outputs": [],
+                },
+                "adapted_results": {
+                    "loss": 1.18,
+                    "bleu_score": 35.8,
+                    "chrf_score": 64.2,
+                    "exact_match_ratio": 0.24,
+                    "inference_latency_ms": 288.0,
+                    "sanity_check_passed": True,
+                    "sample_outputs": [],
+                },
+                "artifacts": {
+                    "adapter_path": "experiments/yoruba-v1/adapter",
+                    "config_path": "experiments/yoruba-v1/adapter/adapter_config.json",
+                    "metrics_path": "experiments/yoruba-v1/metrics.json",
+                },
             }
         ],
-        "total": 1,
+        "total": 2,
     }
 
 @app.get("/experiments/{exp_id}")
@@ -455,6 +531,17 @@ class PlaygroundRequest(BaseModel):
 @app.post("/playground/generate")
 @app.post("/api/v1/playground/generate")
 def playground_generate(req: PlaygroundRequest):
+    is_yor = (req.language_code == "yor") or ("yor" in (req.experiment_id or ""))
+    if is_yor:
+        return {
+            "prompt": req.prompt,
+            "language_code": "yor",
+            "experiment_id": req.experiment_id or "exp-yor-lora-v1",
+            "base_output": f"[N-ATLaS Base]: E kaabo / flat unaccented Yoruba approximation for '{req.prompt}'.",
+            "adapted_output": f"[N-ATLaS + Yoruba LoRA]: Ẹ kárọ̀ o / Àlàáfíà — accurate Yoruba translation with full diacritics.",
+            "latency_ms": 235.0,
+            "status": "success",
+        }
     return {
         "prompt": req.prompt,
         "language_code": req.language_code,

@@ -26,9 +26,9 @@ export const languages: Language[] = [
     name: "Yoruba",
     language_code: "yor",
     region: "Southwestern Nigeria",
-    status: "planned",
+    status: "pilot_active",
     description:
-      "High-resource regional benchmark language planned for multilingual cross-evaluation.",
+      "Regional benchmark language active for multi-adapter cross-evaluation, tone diacritics, and downstream generation.",
   },
   {
     name: "Hausa",
