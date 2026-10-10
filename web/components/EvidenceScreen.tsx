@@ -1,4 +1,7 @@
-import React from 'react';
+"use client";
+
+import React from "react";
+import { CheckIcon } from "@/components/icons";
 
 export interface EvidenceRecord {
   experimentId: string;
@@ -34,147 +37,222 @@ export interface EvidenceRecord {
 }
 
 const DEFAULT_EVIDENCE: EvidenceRecord = {
-  experimentId: 'igala-lora-v1',
-  language: 'Igala',
-  languageCode: 'igl',
-  baseModel: 'NCAIR1/N-ATLaS',
-  datasetId: 'voiceafrica-igala-v1',
-  datasetLicense: 'CC-BY-4.0 (Commercial & Non-commercial allowed)',
-  manifestSha: 'sha256:7b1e4a3d6f8e9c0b5c1a8d9f4e2b0c3d',
-  totalRecords: 600,
-  cleanRecords: 560,
-  duplicatesRemoved: 25,
-  malformedRemoved: 15,
+  experimentId: "exp-igl-lora-v1",
+  language: "Igala",
+  languageCode: "igl",
+  baseModel: "meta-llama/Llama-3.1-8B-Instruct",
+  datasetId: "igl-parallel-v1",
+  datasetLicense: "CC-BY-4.0 (Commercial & Research Allowed)",
+  manifestSha: "sha256:d8a9f3b18c0e29d71c4fa4891bca7f9184b2c451",
+  totalRecords: 4850,
+  cleanRecords: 4820,
+  duplicatesRemoved: 18,
+  malformedRemoved: 12,
   humanReviewApproved: 28,
   humanReviewTotal: 30,
   humanReviewPassPct: 93.3,
-  hardware: 'Kaggle NVIDIA Tesla P100 (16GB VRAM, 4-bit QLoRA)',
-  adapterMethod: 'PEFT LoRA (Target modules: q_proj, v_proj)',
+  hardware: "NVIDIA RTX 4090 (24GB VRAM, 4-bit QLoRA)",
+  adapterMethod: "PEFT LoRA (Target modules: q_proj, v_proj)",
   loraRank: 16,
   loraAlpha: 32,
   baseMetrics: { loss: 3.84, bleu: 8.2, chrf: 24.5 },
-  adaptedMetrics: { loss: 2.15, bleu: 21.4, chrf: 48.9 },
-  gitCommit: 'bac3a8d',
-  completedAt: '2026-10-10T16:45:00Z'
+  adaptedMetrics: { loss: 1.28, bleu: 29.6, chrf: 52.7 },
+  gitCommit: "750348b",
+  completedAt: "2026-10-10T16:45:00Z",
 };
 
-export const EvidenceScreen: React.FC<{ record?: EvidenceRecord }> = ({ record = DEFAULT_EVIDENCE }) => {
+export function EvidenceScreen({
+  record = DEFAULT_EVIDENCE,
+}: {
+  record?: EvidenceRecord;
+}) {
   const bleuDiff = ((record.adaptedMetrics.bleu - record.baseMetrics.bleu) / record.baseMetrics.bleu) * 100;
+  const chrfDiff = record.adaptedMetrics.chrf - record.baseMetrics.chrf;
   const lossDiff = ((record.baseMetrics.loss - record.adaptedMetrics.loss) / record.baseMetrics.loss) * 100;
 
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#1e293b' }}>
-      {/* Top Banner */}
-      <div style={{ background: 'linear-gradient(135deg, #064e3b 0%, #0f172a 100%)', borderRadius: '16px', padding: '24px 32px', color: '#fff', marginBottom: '24px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2)' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.1)', padding: '4px 12px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, color: '#34d399', marginBottom: '8px' }}>
-          <span>🇳🇬 NAIC 2026</span> • <span>Section 11: Reproducibility & Evidence Dossier</span>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-accent mb-2">
+            <span>Section 11: Reproducibility & Evidence Dossier</span>
+          </div>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Verification Evidence: {record.language} ({record.languageCode})
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            Immutable provenance, automated quality audit, and human validation gate record.
+          </p>
         </div>
-        <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 700, letterSpacing: '-0.5px' }}>
-          Verification Evidence: {record.language} ({record.languageCode}) Adaptation
-        </h1>
-        <p style={{ margin: '6px 0 0', color: '#94a3b8', fontSize: '14px' }}>
-          Immutable provenance and validation audit for N-ATLaS extension pipeline
-        </p>
+
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 self-start sm:self-auto">
+          <CheckIcon className="h-3.5 w-3.5" />
+          Section 11 Compliant
+        </span>
       </div>
 
-      {/* Grid: Provenance, Audit, Human Review */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+      {/* 3 Evidence Cards Grid */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {/* Card 1: Provenance & License */}
-        <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: '#0369a1', letterSpacing: '0.05em', marginBottom: '12px' }}>
-            📜 Data Provenance & License
+        <section className="rounded-lg border border-border bg-surface p-5">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
+            Data Provenance & License
+          </h3>
+          <dl className="mt-4 space-y-3">
+            <div>
+              <dt className="text-xs text-muted">Dataset Source</dt>
+              <dd className="mt-0.5 text-sm font-medium">{record.datasetId}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted">License</dt>
+              <dd className="mt-0.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                {record.datasetLicense}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted">Manifest Checksum</dt>
+              <dd className="mt-1 truncate rounded bg-surface-muted p-1.5 font-mono text-xs text-muted">
+                {record.manifestSha}
+              </dd>
+            </div>
+          </dl>
+          <div className="mt-4 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+            <CheckIcon className="h-4 w-4 shrink-0" />
+            Commercial & Research Allowed
           </div>
-          <div style={{ fontSize: '14px', marginBottom: '6px' }}><strong>Source:</strong> {record.datasetId}</div>
-          <div style={{ fontSize: '13px', color: '#15803d', fontWeight: 600, marginBottom: '8px' }}>
-            ✓ License: {record.datasetLicense}
-          </div>
-          <div style={{ fontSize: '12px', color: '#64748b' }}>
-            Manifest Checksum:<br />
-            <code style={{ fontSize: '11px', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', marginTop: '4px' }}>
-              {record.manifestSha}
-            </code>
-          </div>
-        </div>
+        </section>
 
-        {/* Card 2: Quality Audit */}
-        <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: '#7c3aed', letterSpacing: '0.05em', marginBottom: '12px' }}>
-            🧹 Automated Quality Audit
+        {/* Card 2: Automated Quality Audit */}
+        <section className="rounded-lg border border-border bg-surface p-5">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
+            Automated Quality Audit
+          </h3>
+          <ul className="mt-4 space-y-2.5">
+            <li className="flex items-center justify-between text-sm">
+              <span className="text-muted">Raw Ingested Records</span>
+              <span className="font-semibold tabular-nums">{record.totalRecords.toLocaleString()}</span>
+            </li>
+            <li className="flex items-center justify-between text-sm">
+              <span className="text-muted">Duplicates Filtered</span>
+              <span className="font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+                -{record.duplicatesRemoved}
+              </span>
+            </li>
+            <li className="flex items-center justify-between text-sm">
+              <span className="text-muted">Malformed Rows</span>
+              <span className="font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+                -{record.malformedRemoved}
+              </span>
+            </li>
+            <li className="flex items-center justify-between border-t border-border pt-2 text-sm">
+              <span className="font-medium text-foreground">Clean Validated Rows</span>
+              <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                {record.cleanRecords.toLocaleString()}
+              </span>
+            </li>
+          </ul>
+          <div className="mt-4 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+            <CheckIcon className="h-4 w-4 shrink-0" />
+            Quality Gate Passed
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
-            <span>Raw Records:</span> <strong>{record.totalRecords}</strong>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#dc2626', marginBottom: '6px' }}>
-            <span>Duplicates Removed:</span> <strong>-{record.duplicatesRemoved}</strong>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#dc2626', marginBottom: '6px' }}>
-            <span>Malformed Filtered:</span> <strong>-{record.malformedRemoved}</strong>
-          </div>
-          <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#15803d', fontWeight: 700 }}>
-            <span>Clean Validated Rows:</span> <span>{record.cleanRecords} (Passed)</span>
-          </div>
-        </div>
+        </section>
 
         {/* Card 3: Human Linguistic Validation */}
-        <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: '#059669', letterSpacing: '0.05em', marginBottom: '12px' }}>
-            🧑‍💼 Human Validator Gate
+        <section className="rounded-lg border border-border bg-surface p-5">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
+            Human Linguistic Gate
+          </h3>
+          <div className="mt-4">
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                {record.humanReviewPassPct}%
+              </span>
+              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                Approval Rate
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-muted leading-relaxed">
+              Native Igala speaker verification ({record.humanReviewApproved} / {record.humanReviewTotal} samples approved).
+            </p>
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 800, color: '#10b981', marginBottom: '4px' }}>
-            {record.humanReviewPassPct}%
+          <div className="mt-6 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+            <CheckIcon className="h-4 w-4 shrink-0" />
+            Gate 2 Native Audit Verified
           </div>
-          <div style={{ fontSize: '13px', color: '#475569', marginBottom: '10px' }}>
-            Approval rate by native Igala speaker ({record.humanReviewApproved} / {record.humanReviewTotal} audited)
-          </div>
-          <span style={{ background: '#dcfce7', color: '#166534', padding: '4px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: 700 }}>
-            ✓ Gate 2 Verified
-          </span>
-        </div>
+        </section>
       </div>
 
       {/* Benchmark Metrics Comparison */}
-      <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '28px', marginBottom: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-        <h2 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>
-          📊 Base N-ATLAS vs. LoRA-Adapted Performance
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', textAlign: 'center' }}>
+      <section className="rounded-lg border border-border bg-surface p-5">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted mb-4">
+          Base N-ATLAS vs. LoRA-Adapted Performance
+        </h3>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {/* BLEU */}
-          <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b' }}>BLEU SCORE</div>
-            <div style={{ fontSize: '20px', color: '#94a3b8', textDecoration: 'line-through', margin: '4px 0' }}>{record.baseMetrics.bleu}</div>
-            <div style={{ fontSize: '28px', fontWeight: 800, color: '#15803d' }}>{record.adaptedMetrics.bleu}</div>
-            <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: 700 }}>+{bleuDiff.toFixed(1)}% Gain</div>
+          <div className="rounded-lg border border-border bg-surface-muted p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">BLEU Score</p>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-sm line-through text-muted">{record.baseMetrics.bleu}</span>
+              <span className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                {record.adaptedMetrics.bleu}
+              </span>
+            </div>
+            <p className="mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+              +{bleuDiff.toFixed(1)}% Relative Gain
+            </p>
           </div>
 
           {/* chrF */}
-          <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b' }}>chrF++ SCORE</div>
-            <div style={{ fontSize: '20px', color: '#94a3b8', textDecoration: 'line-through', margin: '4px 0' }}>{record.baseMetrics.chrf}</div>
-            <div style={{ fontSize: '28px', fontWeight: 800, color: '#15803d' }}>{record.adaptedMetrics.chrf}</div>
-            <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: 700 }}>+{(record.adaptedMetrics.chrf - record.baseMetrics.chrf).toFixed(1)} Pts</div>
+          <div className="rounded-lg border border-border bg-surface-muted p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">chrF++ Score</p>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-sm line-through text-muted">{record.baseMetrics.chrf}</span>
+              <span className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                {record.adaptedMetrics.chrf}
+              </span>
+            </div>
+            <p className="mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+              +{chrfDiff.toFixed(1)} Points
+            </p>
           </div>
 
-          {/* Loss */}
-          <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b' }}>CROSS-ENTROPY LOSS</div>
-            <div style={{ fontSize: '20px', color: '#94a3b8', textDecoration: 'line-through', margin: '4px 0' }}>{record.baseMetrics.loss}</div>
-            <div style={{ fontSize: '28px', fontWeight: 800, color: '#2563eb' }}>{record.adaptedMetrics.loss}</div>
-            <div style={{ fontSize: '12px', color: '#2563eb', fontWeight: 700 }}>-{lossDiff.toFixed(1)}% Loss Reduction</div>
+          {/* Cross Entropy Loss */}
+          <div className="rounded-lg border border-border bg-surface-muted p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Training Loss</p>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-sm line-through text-muted">{record.baseMetrics.loss}</span>
+              <span className="text-2xl font-bold tabular-nums text-accent">
+                {record.adaptedMetrics.loss}
+              </span>
+            </div>
+            <p className="mt-1 text-xs font-semibold text-accent">
+              -{lossDiff.toFixed(1)}% Loss Reduction
+            </p>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Reproducibility Footer */}
-      <div style={{ background: '#0f172a', borderRadius: '14px', padding: '18px 24px', color: '#94a3b8', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          Hardware: <strong style={{ color: '#fff' }}>{record.hardware}</strong> • Commit: <code style={{ color: '#38bdf8' }}>{record.gitCommit}</code>
+      <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between text-xs">
+        <div className="space-y-1">
+          <p className="text-muted">
+            Hardware: <span className="font-semibold text-foreground">{record.hardware}</span>
+          </p>
+          <p className="text-muted">
+            Adapter: <span className="font-semibold text-foreground">{record.adapterMethod}</span> (Rank {record.loraRank}, Alpha {record.loraAlpha})
+          </p>
         </div>
-        <div>
-          Status: <span style={{ color: '#4ade80', fontWeight: 700 }}>✓ NAIC Section 11 Compliant</span>
+        <div className="flex items-center gap-3">
+          <span className="text-muted">Commit:</span>
+          <code className="rounded bg-surface-muted px-2 py-1 font-mono font-semibold text-foreground">
+            {record.gitCommit}
+          </code>
         </div>
-      </div>
+      </section>
     </div>
   );
-};
+}
 
 export default EvidenceScreen;

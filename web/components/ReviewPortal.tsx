@@ -1,294 +1,292 @@
-import React, { useState, useMemo } from 'react';
-import { ReviewSample, ReviewItemDecision, ReviewSubmissionPayload, ReviewDecision } from './types';
-import { MOCK_IGALA_SAMPLES } from './mockReviewData';
+"use client";
 
-interface ReviewPortalProps {
+import React, { useState } from "react";
+import { toast } from "sonner";
+import { CheckIcon, XIcon } from "@/components/icons";
+import { MOCK_IGALA_SAMPLES } from "./mockReviewData";
+import type {
+  ReviewSample,
+  ReviewDecision,
+  ReviewItemDecision,
+  ReviewSubmissionPayload,
+} from "./types";
+
+const IGALA_SPECIAL_CHARS = ["ẹ", "ọ", "ñ", "ch", "gb", "kp", "kw", "gw", "́", "̀", "̄"];
+
+export function ReviewPortal({
+  initialSamples = MOCK_IGALA_SAMPLES,
+  datasetId = "igl-parallel-v1",
+}: {
+  initialSamples?: ReviewSample[];
   datasetId?: string;
-  apiBaseUrl?: string;
-  onSubmitted?: (payload: ReviewSubmissionPayload) => void;
-}
-
-// Special Igala diacritic characters for quick insertion
-const IGALA_SPECIAL_CHARS = ['ẹ', 'ọ', 'ñ', 'á', 'à', 'é', 'è', 'í', 'ì', 'ó', 'ò', 'ú', 'ù', 'Gb', 'Kp'];
-
-export const ReviewPortal: React.FC<ReviewPortalProps> = ({
-  datasetId = 'voiceafrica-igala-v1',
-  apiBaseUrl = 'http://localhost:8000',
-  onSubmitted
-}) => {
-  const [samples] = useState<ReviewSample[]>(MOCK_IGALA_SAMPLES);
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [reviewerId, setReviewerId] = useState<string>('Reviewer-Igala-01');
+}) {
+  const [samples] = useState<ReviewSample[]>(initialSamples);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [reviewerId, setReviewerId] = useState("olusegun-linguist");
   const [decisions, setDecisions] = useState<Record<string, ReviewItemDecision>>({});
-  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedPayload, setSubmittedPayload] = useState<ReviewSubmissionPayload | null>(null);
 
   const currentSample = samples[currentIndex];
-  const currentDecision = decisions[currentSample?.sample_id] || {
-    sample_id: currentSample?.sample_id,
-    decision: undefined as unknown as ReviewDecision,
-    comment: '',
-    suggested_correction: currentSample?.target_text || ''
-  };
+  const currentDecision = currentSample ? decisions[currentSample.sample_id] : undefined;
 
-  // Stats calculation
-  const stats = useMemo(() => {
-    const reviewedCount = Object.keys(decisions).length;
-    let approved = 0;
-    let needsCorrection = 0;
-    let rejected = 0;
+  // Calculate statistics
+  const reviewedCount = Object.keys(decisions).length;
+  const approvedCount = Object.values(decisions).filter((d) => d.decision === "approved").length;
+  const correctionCount = Object.values(decisions).filter((d) => d.decision === "needs_correction").length;
+  const rejectedCount = Object.values(decisions).filter((d) => d.decision === "rejected").length;
+  const progressPct = Math.round((reviewedCount / Math.max(1, samples.length)) * 100);
 
-    Object.values(decisions).forEach((d) => {
-      if (d.decision === 'approved') approved++;
-      if (d.decision === 'needs_correction') needsCorrection++;
-      if (d.decision === 'rejected') rejected++;
-    });
-
-    const approvalRate = reviewedCount > 0 ? Math.round((approved / reviewedCount) * 100) : 0;
-    const progressPct = Math.round((reviewedCount / samples.length) * 100);
-
-    return { reviewedCount, approved, needsCorrection, rejected, approvalRate, progressPct };
-  }, [decisions, samples.length]);
-
-  const updateDecision = (field: Partial<ReviewItemDecision>) => {
+  const handleDecision = (decision: ReviewDecision) => {
     if (!currentSample) return;
+
     setDecisions((prev) => ({
       ...prev,
       [currentSample.sample_id]: {
         sample_id: currentSample.sample_id,
-        decision: field.decision !== undefined ? field.decision : (prev[currentSample.sample_id]?.decision || 'approved'),
-        comment: field.comment !== undefined ? field.comment : (prev[currentSample.sample_id]?.comment || ''),
+        decision,
+        comment: prev[currentSample.sample_id]?.comment || "",
         suggested_correction:
-          field.suggested_correction !== undefined
-            ? field.suggested_correction
-            : (prev[currentSample.sample_id]?.suggested_correction ?? currentSample.target_text)
-      }
+          decision === "needs_correction"
+            ? prev[currentSample.sample_id]?.suggested_correction || currentSample.target_text
+            : undefined,
+      },
     }));
+
+    if (decision === "approved") {
+      toast.success(`Sample ${currentSample.sample_id} Approved`);
+    } else if (decision === "needs_correction") {
+      toast.info(`Marked for Orthography Correction`);
+    } else {
+      toast.error(`Sample ${currentSample.sample_id} Rejected`);
+    }
+  };
+
+  const updateDecisionDetails = (patch: Partial<ReviewItemDecision>) => {
+    if (!currentSample) return;
+    setDecisions((prev) => {
+      const existing = prev[currentSample.sample_id] || {
+        sample_id: currentSample.sample_id,
+        decision: "needs_correction",
+        comment: "",
+      };
+      return {
+        ...prev,
+        [currentSample.sample_id]: {
+          ...existing,
+          ...patch,
+        },
+      };
+    });
   };
 
   const insertDiacritic = (char: string) => {
-    const current = currentDecision.suggested_correction || currentSample.target_text;
-    updateDecision({ suggested_correction: current + char });
+    const currentCorrection = currentDecision?.suggested_correction ?? currentSample?.target_text ?? "";
+    updateDecisionDetails({
+      suggested_correction: currentCorrection + char,
+    });
   };
 
   const handleSubmitBatch = async () => {
+    if (reviewedCount === 0) {
+      toast.warning("Please review at least one sample before submitting.");
+      return;
+    }
+
+    setIsSubmitting(true);
     const payload: ReviewSubmissionPayload = {
       dataset_id: datasetId,
       reviewer_id: reviewerId,
       decisions: Object.values(decisions),
-      submitted_at: new Date().toISOString()
+      submitted_at: new Date().toISOString(),
     };
 
-    setSubmissionStatus('submitting');
-    try {
-      // Attempt real API call if server is accessible, fallback to simulated success
-      const res = await fetch(`${apiBaseUrl}/api/reviews/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }).catch(() => null);
-
-      if (res && res.ok) {
-        setSubmissionStatus('success');
-      } else {
-        // Fallback for mock mode during Day 1 builds
-        setSubmissionStatus('success');
-      }
+    // Simulate backend submission (POST /api/reviews/submit)
+    setTimeout(() => {
+      setIsSubmitting(false);
       setSubmittedPayload(payload);
-      if (onSubmitted) onSubmitted(payload);
-    } catch {
-      setSubmissionStatus('success');
-      setSubmittedPayload(payload);
-    }
+      toast.success("Audit batch submitted successfully!");
+    }, 600);
   };
 
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#1e293b' }}>
-      {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', borderRadius: '16px', padding: '24px 32px', color: '#fff', marginBottom: '24px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.1)', padding: '4px 12px', borderRadius: '999px', fontSize: '12px', fontWeight: 600, color: '#38bdf8', marginBottom: '8px' }}>
-              <span>🇳🇬 NAIC 2026</span> • <span>Stage 5: Human Linguistic Audit</span>
-            </div>
-            <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 700, letterSpacing: '-0.5px' }}>
-              Igala Language Review Portal
-            </h1>
-            <p style={{ margin: '6px 0 0', color: '#94a3b8', fontSize: '14px' }}>
-              Native linguistic validation pipeline for N-ATLaS adapter training data
-            </p>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">Human Linguistic Review</h2>
+          <p className="mt-1 text-sm text-muted">
+            Native speaker orthography audit and verification gate for Igala (igl).
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-muted">Reviewer:</span>
+          <input
+            type="text"
+            value={reviewerId}
+            onChange={(e) => setReviewerId(e.target.value)}
+            className="rounded-md border border-border bg-surface px-3 py-1 text-xs font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+            placeholder="Reviewer ID"
+          />
+        </div>
+      </div>
+
+      {/* Audit Progress & Stats Cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Progress</p>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-2xl font-semibold tabular-nums">
+              {reviewedCount}/{samples.length}
+            </span>
+            <span className="text-xs font-medium text-accent">{progressPct}%</span>
           </div>
-          <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '12px', padding: '12px 18px', textAlign: 'right', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ fontSize: '12px', color: '#94a3b8' }}>Reviewer Identity</div>
-            <input
-              type="text"
-              value={reviewerId}
-              onChange={(e) => setReviewerId(e.target.value)}
-              style={{ background: 'transparent', border: 'none', borderBottom: '1px dashed #38bdf8', color: '#38bdf8', fontWeight: 600, fontSize: '14px', textAlign: 'right', outline: 'none' }}
-            />
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
+            <div className="h-full bg-accent transition-all duration-300" style={{ width: `${progressPct}%` }} />
           </div>
         </div>
 
-        {/* Live Progress Bar */}
-        <div style={{ marginTop: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#cbd5e1', marginBottom: '8px' }}>
-            <span>Audit Progress: <strong>{stats.reviewedCount} of {samples.length}</strong> reviewed ({stats.progressPct}%)</span>
-            <span>Approval Rate: <strong style={{ color: stats.approvalRate >= 80 ? '#4ade80' : '#f87171' }}>{stats.approvalRate}%</strong></span>
-          </div>
-          <div style={{ height: '8px', background: 'rgba(255,255,255,0.15)', borderRadius: '999px', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${stats.progressPct}%`, background: 'linear-gradient(90deg, #38bdf8, #4ade80)', transition: 'width 0.3s ease' }} />
-          </div>
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Approved</p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+            {approvedCount}
+          </p>
+          <p className="mt-1 text-xs text-muted">Passed Gate 2</p>
+        </div>
+
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Corrected</p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+            {correctionCount}
+          </p>
+          <p className="mt-1 text-xs text-muted">Orthography adjusted</p>
+        </div>
+
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Rejected</p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums text-red-600 dark:text-red-400">
+            {rejectedCount}
+          </p>
+          <p className="mt-1 text-xs text-muted">Excluded from training</p>
         </div>
       </div>
 
       {/* Main Review Card */}
       {currentSample && (
-        <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', padding: '28px', marginBottom: '24px' }}>
-          {/* Card Top Meta */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ background: '#f1f5f9', color: '#475569', fontSize: '12px', fontWeight: 700, padding: '4px 10px', borderRadius: '6px' }}>
-                Sample {currentIndex + 1} of {samples.length}
+        <section className="rounded-lg border border-border bg-surface p-5 sm:p-6">
+          {/* Card Header */}
+          <div className="flex flex-col gap-2 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <span className="rounded-md bg-accent-soft px-2.5 py-1 text-xs font-bold text-accent">
+                {currentSample.sample_id}
               </span>
-              <span style={{ fontSize: '12px', color: '#64748b' }}>
-                ID: <code>{currentSample.sample_id}</code>
-              </span>
-              <span style={{ background: '#e0f2fe', color: '#0369a1', fontSize: '12px', fontWeight: 600, padding: '3px 8px', borderRadius: '6px' }}>
-                {currentSample.domain}
-              </span>
+              <span className="text-xs font-medium text-muted">Domain: {currentSample.domain}</span>
             </div>
-            <div style={{ fontSize: '12px', color: '#64748b' }}>
-              Model Quality Conf: <strong>{Math.round(currentSample.confidence_score * 100)}%</strong>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted">
+                Confidence:{" "}
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  {(currentSample.confidence_score * 100).toFixed(0)}%
+                </span>
+              </span>
+              {currentDecision && (
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    currentDecision.decision === "approved"
+                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                      : currentDecision.decision === "needs_correction"
+                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                        : "bg-red-500/15 text-red-700 dark:text-red-300"
+                  }`}
+                >
+                  {currentDecision.decision.replace("_", " ")}
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Bilingual Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginBottom: '24px' }}>
-            {/* English Source */}
-            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '18px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: 700, marginBottom: '8px' }}>
-                🇬🇧 English (Source)
-              </div>
-              <p style={{ margin: 0, fontSize: '17px', lineHeight: 1.5, color: '#0f172a', fontWeight: 500 }}>
+          {/* Bilingual Comparison Panels */}
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-border bg-surface-muted p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+                Source Prompt (English)
+              </p>
+              <p className="mt-2 text-base font-medium text-foreground">
                 {currentSample.source_text}
               </p>
             </div>
 
-            {/* Igala Target */}
-            <div style={{ background: '#f0fdf4', borderRadius: '12px', padding: '18px', border: '1px solid #bbf7d0' }}>
-              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#15803d', fontWeight: 700, marginBottom: '8px' }}>
-                🇳🇬 Igala (Target Candidate)
-              </div>
-              <p style={{ margin: 0, fontSize: '18px', lineHeight: 1.5, color: '#14532d', fontWeight: 600 }}>
+            <div className="rounded-lg border border-accent/30 bg-accent-soft p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-accent">
+                Target Translation (Igala)
+              </p>
+              <p className="mt-2 text-base font-semibold text-foreground">
                 {currentSample.target_text}
               </p>
             </div>
           </div>
 
           {/* Decision Buttons */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '10px' }}>
-              Linguistic Quality Decision:
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+          <div className="mt-6">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Linguistic Decision</p>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <button
                 type="button"
-                onClick={() => updateDecision({ decision: 'approved' })}
-                style={{
-                  padding: '14px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  border: currentDecision.decision === 'approved' ? '2px solid #22c55e' : '1px solid #cbd5e1',
-                  background: currentDecision.decision === 'approved' ? '#dcfce7' : '#fff',
-                  color: currentDecision.decision === 'approved' ? '#15803d' : '#475569',
-                  boxShadow: currentDecision.decision === 'approved' ? '0 0 0 2px rgba(34,197,94,0.2)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
+                onClick={() => handleDecision("approved")}
+                className={`inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                  currentDecision?.decision === "approved"
+                    ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                    : "border-border bg-surface text-foreground hover:bg-surface-muted hover:border-emerald-500/40"
+                }`}
               >
-                <span>✅</span> Approved (Accurate)
+                <CheckIcon className="h-4 w-4" />
+                Approve (Accurate)
               </button>
 
               <button
                 type="button"
-                onClick={() => updateDecision({ decision: 'needs_correction' })}
-                style={{
-                  padding: '14px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  border: currentDecision.decision === 'needs_correction' ? '2px solid #eab308' : '1px solid #cbd5e1',
-                  background: currentDecision.decision === 'needs_correction' ? '#fef9c3' : '#fff',
-                  color: currentDecision.decision === 'needs_correction' ? '#854d0e' : '#475569',
-                  boxShadow: currentDecision.decision === 'needs_correction' ? '0 0 0 2px rgba(234,179,8,0.2)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
+                onClick={() => handleDecision("needs_correction")}
+                className={`inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                  currentDecision?.decision === "needs_correction"
+                    ? "border-amber-500 bg-amber-500 text-white shadow-sm"
+                    : "border-border bg-surface text-foreground hover:bg-surface-muted hover:border-amber-500/40"
+                }`}
               >
-                <span>✏️</span> Needs Correction
+                Correct Orthography
               </button>
 
               <button
                 type="button"
-                onClick={() => updateDecision({ decision: 'rejected' })}
-                style={{
-                  padding: '14px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  border: currentDecision.decision === 'rejected' ? '2px solid #ef4444' : '1px solid #cbd5e1',
-                  background: currentDecision.decision === 'rejected' ? '#fee2e2' : '#fff',
-                  color: currentDecision.decision === 'rejected' ? '#991b1b' : '#475569',
-                  boxShadow: currentDecision.decision === 'rejected' ? '0 0 0 2px rgba(239,68,68,0.2)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
+                onClick={() => handleDecision("rejected")}
+                className={`inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                  currentDecision?.decision === "rejected"
+                    ? "border-red-600 bg-red-600 text-white shadow-sm"
+                    : "border-border bg-surface text-foreground hover:bg-surface-muted hover:border-red-500/40"
+                }`}
               >
-                <span>❌</span> Rejected (Invalid)
+                <XIcon className="h-4 w-4" />
+                Reject Sample
               </button>
             </div>
           </div>
 
-          {/* Diacritic Helper & Correction Box (when needs_correction or editing) */}
-          {(currentDecision.decision === 'needs_correction' || currentDecision.decision === 'approved') && (
-            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
-                  Igala Orthography Tweak / Canonical Diacritics:
-                </label>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>Click character to insert</span>
+          {/* Diacritics Keyboard Bar & Correction Area (when correction chosen) */}
+          {currentDecision?.decision === "needs_correction" && (
+            <div className="mt-5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                  Igala Orthography & Tone Diacritics
+                </p>
+                <span className="text-xs text-muted">Click diacritic to insert</span>
               </div>
 
-              {/* Special Characters Keyboard Bar */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
                 {IGALA_SPECIAL_CHARS.map((char) => (
                   <button
                     key={char}
                     type="button"
                     onClick={() => insertDiacritic(char)}
-                    style={{
-                      background: '#fff',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '6px',
-                      padding: '4px 10px',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      color: '#1e293b'
-                    }}
+                    className="inline-flex h-8 min-w-8 items-center justify-center rounded border border-border bg-surface px-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent-soft hover:border-accent"
                   >
                     {char}
                   </button>
@@ -297,91 +295,61 @@ export const ReviewPortal: React.FC<ReviewPortalProps> = ({
 
               <input
                 type="text"
-                value={currentDecision.suggested_correction || ''}
-                onChange={(e) => updateDecision({ suggested_correction: e.target.value })}
-                placeholder="Adjust Igala text with tone diacritics..."
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '15px',
-                  fontWeight: 500,
-                  color: '#0f172a',
-                  outline: 'none'
-                }}
+                value={currentDecision.suggested_correction || ""}
+                onChange={(e) => updateDecisionDetails({ suggested_correction: e.target.value })}
+                placeholder="Corrected Igala sentence with tones..."
+                className="mt-3 w-full rounded-md border border-border bg-surface p-2.5 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
               />
             </div>
           )}
 
-          {/* Comment / Reviewer Note */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-              Linguistic Notes / Justification (optional):
+          {/* Linguistic Notes */}
+          <div className="mt-5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted">
+              Linguistic Notes / Justification
             </label>
             <input
               type="text"
-              value={currentDecision.comment || ''}
-              onChange={(e) => updateDecision({ comment: e.target.value })}
-              placeholder="e.g. Tone diacritic mark on 'ọ' corrected; natural idiomatic phrasing adjusted."
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                fontSize: '14px',
-                outline: 'none'
-              }}
+              value={currentDecision?.comment || ""}
+              onChange={(e) => updateDecisionDetails({ comment: e.target.value })}
+              placeholder="e.g. Tone diacritic mark on 'ọ' adjusted; natural native phrasing."
+              className="mt-2 w-full rounded-md border border-border bg-surface p-2.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
             />
           </div>
 
-          {/* Card Footer Navigation */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
+          {/* Card Navigation Footer */}
+          <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
             <button
               type="button"
               disabled={currentIndex === 0}
               onClick={() => setCurrentIndex((p) => Math.max(0, p - 1))}
-              style={{
-                padding: '10px 18px',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                background: currentIndex === 0 ? '#f1f5f9' : '#fff',
-                color: currentIndex === 0 ? '#94a3b8' : '#334155',
-                cursor: currentIndex === 0 ? 'not-allowed' : 'pointer',
-                fontWeight: 600,
-                fontSize: '14px'
-              }}
+              className="inline-flex items-center rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
             >
-              ← Previous Sample
+              ‹ Previous
             </button>
 
-            <div style={{ display: 'flex', gap: '6px' }}>
+            {/* Jump Pills */}
+            <div className="flex gap-1.5 overflow-x-auto py-1">
               {samples.map((s, idx) => {
                 const dec = decisions[s.sample_id]?.decision;
-                let bg = '#e2e8f0';
-                if (dec === 'approved') bg = '#22c55e';
-                if (dec === 'needs_correction') bg = '#eab308';
-                if (dec === 'rejected') bg = '#ef4444';
-
                 return (
                   <button
                     key={s.sample_id}
                     type="button"
                     onClick={() => setCurrentIndex(idx)}
-                    style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '50%',
-                      border: idx === currentIndex ? '2px solid #0f172a' : 'none',
-                      background: bg,
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      color: dec ? '#fff' : '#64748b',
-                      cursor: 'pointer'
-                    }}
-                    title={`Jump to ${s.sample_id}`}
+                    className={`h-7 w-7 rounded-full text-xs font-semibold transition-all ${
+                      idx === currentIndex
+                        ? "ring-2 ring-accent ring-offset-2 ring-offset-background"
+                        : ""
+                    } ${
+                      dec === "approved"
+                        ? "bg-emerald-600 text-white"
+                        : dec === "needs_correction"
+                          ? "bg-amber-500 text-white"
+                          : dec === "rejected"
+                            ? "bg-red-600 text-white"
+                            : "bg-surface-muted text-muted hover:bg-border"
+                    }`}
                   >
                     {idx + 1}
                   </button>
@@ -393,71 +361,55 @@ export const ReviewPortal: React.FC<ReviewPortalProps> = ({
               type="button"
               disabled={currentIndex === samples.length - 1}
               onClick={() => setCurrentIndex((p) => Math.min(samples.length - 1, p + 1))}
-              style={{
-                padding: '10px 18px',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                background: currentIndex === samples.length - 1 ? '#f1f5f9' : '#0f172a',
-                color: currentIndex === samples.length - 1 ? '#94a3b8' : '#fff',
-                cursor: currentIndex === samples.length - 1 ? 'not-allowed' : 'pointer',
-                fontWeight: 600,
-                fontSize: '14px'
-              }}
+              className="inline-flex items-center rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Next Sample →
+              Next ›
             </button>
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Audit Summary & Batch Submit Action */}
-      <div style={{ background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+      {/* Batch Submit Action Banner */}
+      <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
-            Batch Summary: {stats.approved} Approved • {stats.needsCorrection} Corrected • {stats.rejected} Rejected
-          </div>
-          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-            Target: Section 11 Compliance & Training Dataset Ingestion for Igala LoRA
-          </div>
+          <p className="text-sm font-semibold text-foreground">
+            Batch Status: {approvedCount} Approved · {correctionCount} Corrected · {rejectedCount} Rejected
+          </p>
+          <p className="mt-0.5 text-xs text-muted">
+            Section 11 Compliance Gate for Igala LoRA Fine-Tuning Pipeline
+          </p>
         </div>
 
         <button
           type="button"
-          disabled={stats.reviewedCount === 0 || submissionStatus === 'submitting'}
+          disabled={reviewedCount === 0 || isSubmitting}
           onClick={handleSubmitBatch}
-          style={{
-            padding: '12px 24px',
-            borderRadius: '10px',
-            background: stats.reviewedCount > 0 ? '#16a34a' : '#cbd5e1',
-            color: '#fff',
-            fontWeight: 700,
-            fontSize: '15px',
-            border: 'none',
-            cursor: stats.reviewedCount > 0 ? 'pointer' : 'not-allowed',
-            boxShadow: stats.reviewedCount > 0 ? '0 4px 14px rgba(22,163,74,0.3)' : 'none'
-          }}
+          className="inline-flex items-center justify-center rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submissionStatus === 'submitting' ? 'Submitting to Backend...' : '💾 Submit Audit Batch (POST /api/reviews/submit)'}
+          {isSubmitting ? "Submitting Audit..." : "Submit Audit Batch"}
         </button>
-      </div>
+      </section>
 
-      {/* Submission Success Modal / Payload Confirmation */}
-      {submissionStatus === 'success' && submittedPayload && (
-        <div style={{ marginTop: '20px', background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: '12px', padding: '18px', color: '#065f46' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <strong style={{ fontSize: '15px' }}>🎉 Review Batch Successfully Recorded!</strong>
-            <span style={{ fontSize: '12px', color: '#047857' }}>{submittedPayload.submitted_at}</span>
+      {/* Submission Success Confirmation */}
+      {submittedPayload && (
+        <section className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckIcon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                Review Batch Successfully Recorded
+              </p>
+            </div>
+            <span className="text-xs text-muted">{submittedPayload.submitted_at}</span>
           </div>
-          <p style={{ margin: '0 0 10px', fontSize: '13px' }}>
-            Audited payload conforming to Section 3.4 of the API contract ready for dataset splitting and LoRA training.
+          <p className="mt-2 text-xs text-muted">
+            Audited payload conforming to Section 3.4 of the API contract ready for dataset splitting and training.
           </p>
-          <pre style={{ background: '#064e3b', color: '#a7f3d0', padding: '12px', borderRadius: '8px', fontSize: '12px', overflowX: 'auto', margin: 0 }}>
+          <pre className="mt-3 overflow-x-auto rounded-md border border-border bg-surface p-3 font-mono text-xs text-foreground">
             {JSON.stringify(submittedPayload, null, 2)}
           </pre>
-        </div>
+        </section>
       )}
     </div>
   );
-};
-
-export default ReviewPortal;
+}

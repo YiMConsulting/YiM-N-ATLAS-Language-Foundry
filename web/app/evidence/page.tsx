@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/components/coming-soon";
+import { EvidenceScreen } from "@/components/EvidenceScreen";
 
 export const metadata: Metadata = {
-  title: "Evidence | N-ATLAS Language Foundry",
+  title: "Evidence Dossier | N-ATLAS Language Foundry",
+  description: "Section 11 reproducibility and evidence verification for Igala adaptation.",
 };
 
 export default function EvidencePage() {
-  return <ComingSoon title="Evidence" />;
+  return <EvidenceScreen />;
 }
