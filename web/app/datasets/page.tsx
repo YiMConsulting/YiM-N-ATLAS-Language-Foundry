@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import { DatasetList } from "@/components/datasets/dataset-list";
-import { datasets } from "@/lib/datasets";
+import { getDatasets } from "@/lib/api/datasets";
 
 export const metadata: Metadata = {
   title: "Datasets | N-ATLAS Language Foundry",
   description: "Datasets registered in the N-ATLAS Language Foundry.",
 };
 
-export default function DatasetsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function DatasetsPage() {
+  const { items } = await getDatasets();
+
   return (
     <div className="space-y-6">
       <div>
@@ -17,7 +21,11 @@ export default function DatasetsPage() {
         </p>
       </div>
 
-      <DatasetList datasets={datasets} />
+      {items.length === 0 ? (
+        <p className="text-sm text-muted">No datasets registered yet.</p>
+      ) : (
+        <DatasetList datasets={items} />
+      )}
     </div>
   );
 }

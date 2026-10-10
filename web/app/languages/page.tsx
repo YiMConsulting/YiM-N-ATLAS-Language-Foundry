@@ -1,14 +1,18 @@
-import type { Metadata } from "next";
+ import type { Metadata } from "next";
 import { AddLanguageButton } from "@/components/languages/add-language-button";
 import { LanguageList } from "@/components/languages/language-list";
-import { languages } from "@/lib/languages";
+import { getLanguages } from "@/lib/api/language";
 
 export const metadata: Metadata = {
   title: "Languages | N-ATLAS Language Foundry",
   description: "Languages registered in the N-ATLAS Language Foundry.",
 };
 
-export default function LanguagesPage() {
+export const dynamic = "force-dynamic";
+
+export default async function LanguagesPage() {
+  const { items } = await getLanguages();
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -21,7 +25,11 @@ export default function LanguagesPage() {
         <AddLanguageButton />
       </div>
 
-      <LanguageList languages={languages} />
+      {items.length === 0 ? (
+        <p className="text-sm text-muted">No languages registered yet.</p>
+      ) : (
+        <LanguageList languages={items} />
+      )}
     </div>
   );
 }
