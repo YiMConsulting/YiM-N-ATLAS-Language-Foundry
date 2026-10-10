@@ -1,0 +1,4 @@
+-r requirements-api.txt
+
+pytest
+pytest-asyncio
