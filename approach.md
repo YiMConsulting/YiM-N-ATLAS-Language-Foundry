@@ -628,3 +628,73 @@ The existing LoRA GPU smoke test remains evidence of successful model setup and 
 **Checkpoint status:** Training runner implementation and automated tests passed. Real-model training and comparative evaluation remain pending.
 
 **Next checkpoint:** Validate the runner against the real N-ATLaS model and prepared dataset in Kaggle, beginning with a controlled training run before attempting a larger experiment.
+
+
+
+
+## Initial Language Experiment: Tiv
+
+N-ATLAS Language Foundry is designed to support adaptation across Nigerian languages, rather than being tied to a single language.
+
+Igala was initially selected as the first experimental language. However, during data exploration, obtaining an accessible corpus suitable for the intended training and evaluation workflow proved difficult. We therefore shifted the initial experiment to Tiv after identifying candidate English–Tiv parallel data sources.
+
+This is a practical change to the first experiment, not a change in the Foundry's architecture or long-term scope.
+
+The Tiv pilot will help validate the complete workflow: dataset discovery, provenance tracking, automated quality auditing, human review, reproducible splitting, model adaptation, and baseline-versus-adapted evaluation. The resulting workflow should then be reusable for Igala and other Nigerian languages when suitable data becomes available.
+
+The identified Tiv datasets remain candidates until their provenance, licensing, quality, and suitability for the experiment have been reviewed.
+
+
+
+## Current Project Direction and Language Selection
+
+### Foundry Objective
+
+N-ATLaS Language Foundry is intended to provide a reusable, auditable workflow for adapting N-ATLaS to additional Nigerian languages. Its purpose is to make dataset preparation, quality control, human review, experiment management, training, and evaluation repeatable across languages.
+
+The Foundry is not intended to be a separate foundation model. Its value lies in the infrastructure and evidence surrounding adaptation: traceable data, reproducible experiments, comparable evaluations, and independently tracked adapters.
+
+### Change from Igala to Tiv
+
+Igala was the initial laboratory language considered during project planning. However, access to the researched Igala dataset corpus could not be obtained. The project therefore changed its initial adaptation experiment to Tiv, for which accessible candidate data sources were identified.
+
+This is a change in the pilot language, not in the Foundry's general architecture. The canonical dataset schema, quality auditing, human-review workflow, dataset builder, experiment contracts, and training pipeline must remain reusable across languages.
+
+The Tiv pilot currently considers two independent sources:
+
+- MT560: an English–Tiv parallel corpus.
+- Hypa Text-10k: a multilingual instruction dataset from which explicit English-to-Tiv candidates were extracted.
+
+The sources remain separate while provenance, licensing, structural quality, and translation accuracy are assessed. The recorded dataset revisions and declared licenses are preliminary provenance evidence, not a substitute for reviewing the actual license terms and source conditions.
+
+### Current Data and Review Status
+
+The initial structural audit found:
+
+- MT560: 184,113 loaded records, 391 exact duplicate pairs, and 3,116 repeated English inputs.
+- Hypa Text-10k: 103 explicit English-to-Tiv candidates, with six records flagged by the current heuristic review checks.
+
+Repeated English inputs are not automatically invalid. They may have different legitimate translations or occur in different contexts. Structural flags therefore identify records or groups requiring further inspection; they do not, by themselves, establish translation errors.
+
+Human reviewers will assess translation accuracy, meaning completeness, Tiv naturalness, and formatting. Review decisions must remain separate from the original source records.
+
+### Dataset Split Strategy Update
+
+The Dataset Builder supports two split strategies:
+
+- `random`: deterministic random splitting, retained as the default for backward compatibility.
+- `grouped_by_input`: deterministic splitting that keeps records with the same normalized input in one partition.
+
+The grouped strategy normalizes input text by collapsing whitespace, trimming surrounding whitespace, and applying case folding. It then assigns whole groups to partitions using a deterministic heuristic that minimizes incremental squared deviation from the target partition sizes.
+
+Grouped splitting may produce approximate rather than exact 75/10/15 proportions because groups must remain intact. It prevents normalized exact-input variants from crossing partitions, but does not detect semantic duplicates or all possible forms of data leakage.
+
+Automated regression tests cover the grouped behavior, and the full backend suite has passed 105 tests. These results validate the tested software behavior; they do not establish linguistic quality or successful model adaptation.
+
+### Immediate Next Milestones
+
+1. Complete and review the documentation for the current data and splitting workflow.
+2. Add integration tests covering the complete dataset preparation path and verify that source identity and split isolation are preserved.
+3. Prepare a provisional MT560-only training experiment in Kaggle, keeping Hypa separate.
+4. Evaluate the unadapted base model and adapted model using the same held-out test partition.
+5. Incorporate qualified human-review findings before making final claims about dataset eligibility or translation quality.
