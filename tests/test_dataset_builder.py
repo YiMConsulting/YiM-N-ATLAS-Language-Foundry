@@ -6,6 +6,7 @@ import pytest
 
 from foundry.datasets.builder import DatasetBuilder
 from foundry.datasets.record import DatasetRecord
+from foundry.datasets.split import SplitStrategy
 
 
 def write_jsonl(path: Path, records: list[dict]) -> None:
@@ -362,3 +363,58 @@ def test_builder_handles_duplicates_and_exclusions(tmp_path: Path):
     assert result.duplicate_records == 2  # 1 duplicate id + 1 duplicate content
     assert result.excluded_records == 3   # 1 yor + 1 empty input + 1 missing target
     assert result.split.total_records == 2  # igl-001 and igl-005
+
+
+def test_grouped_split_keeps_normalized_inputs_together(
+    tmp_path: Path,
+):
+    source = tmp_path / "dataset.jsonl"
+    records = []
+    for i in range(30):
+        records.extend([
+            {
+                "id": f"tiv-{i:03d}-a",
+                "input": f"Shared input {i}",
+                "target": f"Tiv translation {i} A",
+            },
+            {
+                "id": f"tiv-{i:03d}-b",
+                "input": f"  SHARED   INPUT {i}  ",
+                "target": f"Tiv translation {i} B",
+            },
+        ])
+    write_jsonl(source, records)
+
+    output = tmp_path / "grouped-output"
+    result = DatasetBuilder(
+        dataset_id="tiv-grouped-test",
+        dataset_path=source,
+        language_code="tiv",
+        output_dir=output,
+        seed=42,
+        split_strategy=SplitStrategy.grouped_by_input,
+    ).build()
+
+    split_names = ["train", "validation", "test"]
+    input_partitions = {}
+    for split_name in split_names:
+        split_records = read_jsonl(
+            output / f"{split_name}.jsonl"
+        )
+        for record in split_records:
+            normalized = " ".join(
+                record["input"].casefold().split()
+            )
+            input_partitions.setdefault(
+                normalized, set()
+            ).add(split_name)
+
+    # All normalized versions of the same English input
+    # must remain in a single partition.
+    assert len(input_partitions) == 30
+    assert all(
+        len(partitions) == 1
+        for partitions in input_partitions.values()
+    )
+    assert result.split.strategy == SplitStrategy.grouped_by_input
+    assert result.split.total_records == 60

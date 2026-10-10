@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import random
+import re
 from typing import Iterable
 
 import pandas as pd
@@ -35,6 +36,7 @@ class DatasetBuilder:
         *,
         file_format: str | None = None,
         seed: int = 42,
+        split_strategy: SplitStrategy | str = SplitStrategy.random,
         train_ratio: float = 0.75,
         validation_ratio: float = 0.10,
         test_ratio: float = 0.15,
@@ -49,6 +51,7 @@ class DatasetBuilder:
             else self.dataset_path.suffix.lstrip(".").lower()
         )
         self.seed = seed
+        self.split_strategy = SplitStrategy(split_strategy)
         self.train_ratio = train_ratio
         self.validation_ratio = validation_ratio
         self.test_ratio = test_ratio
@@ -218,27 +221,81 @@ class DatasetBuilder:
         list[DatasetRecord],
         list[DatasetRecord],
     ]:
-        shuffled = list(records)
         rng = random.Random(self.seed)
-        rng.shuffle(shuffled)
-        total = len(shuffled)
-        train_end = int(
-            total * self.train_ratio
-        )
-        validation_end = train_end + int(
-            total * self.validation_ratio
-        )
-        train_records = shuffled[:train_end]
-        validation_records = shuffled[
-            train_end:validation_end
-        ]
-        test_records = shuffled[
-            validation_end:
-        ]
-        return (
-            train_records,
-            validation_records,
-            test_records,
+        if self.split_strategy == SplitStrategy.random:
+            shuffled = list(records)
+            rng.shuffle(shuffled)
+            total = len(shuffled)
+            train_end = int(
+                total * self.train_ratio
+            )
+            validation_end = train_end + int(
+                total * self.validation_ratio
+            )
+            return (
+                shuffled[:train_end],
+                shuffled[train_end:validation_end],
+                shuffled[validation_end:],
+            )
+        if self.split_strategy == SplitStrategy.grouped_by_input:
+            # Group by normalized source text. This prevents case or
+            # whitespace variations of the same input crossing splits.
+            groups: dict[str, list[DatasetRecord]] = {}
+            for record in records:
+                normalized_input = re.sub(
+                    r"\s+", " ", record.input
+                ).strip().casefold()
+                groups.setdefault(normalized_input, []).append(record)
+            group_items = list(groups.items())
+            # Randomize ties, then place larger groups first.
+            # This is deterministic for a fixed seed and input ordering.
+            rng.shuffle(group_items)
+            group_items.sort(
+                key=lambda item: len(item[1]),
+                reverse=True,
+            )
+            total = len(records)
+            target_sizes = [
+                total * self.train_ratio,
+                total * self.validation_ratio,
+                total * self.test_ratio,
+            ]
+            partitions: list[list[DatasetRecord]] = [
+                [],
+                [],
+                [],
+            ]
+            current_sizes = [0, 0, 0]
+            for _, group_records in group_items:
+                group_size = len(group_records)
+
+                # Choose the partition that adds the least squared
+                # deviation from its target record count.
+                def incremental_error(partition_index: int) -> float:
+                    before = (
+                        current_sizes[partition_index]
+                        - target_sizes[partition_index]
+                    )
+                    after = (
+                        current_sizes[partition_index]
+                        + group_size
+                        - target_sizes[partition_index]
+                    )
+                    return after**2 - before**2
+
+                destination = min(
+                    range(3),
+                    key=incremental_error,
+                )
+                partitions[destination].extend(group_records)
+                current_sizes[destination] += group_size
+            return (
+                partitions[0],
+                partitions[1],
+                partitions[2],
+            )
+        raise ValueError(
+            f"Unsupported split strategy: {self.split_strategy}"
         )
 
     def _write_jsonl(
@@ -292,7 +349,7 @@ class DatasetBuilder:
         return DatasetSplit(
             id=f"{self.dataset_id}-split-{self.seed}",
             dataset_id=self.dataset_id,
-            strategy=SplitStrategy.random,
+            strategy=self.split_strategy,
             seed=self.seed,
             train_ratio=self.train_ratio,
             validation_ratio=self.validation_ratio,

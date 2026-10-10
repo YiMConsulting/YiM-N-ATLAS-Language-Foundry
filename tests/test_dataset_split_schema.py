@@ -97,4 +97,4 @@ def test_zero_ratio_is_rejected():
 
 
 def test_split_strategy_values():
-    assert [s.value for s in SplitStrategy] == ["random"]
+    assert [s.value for s in SplitStrategy] == ["random", "grouped_by_input"]
