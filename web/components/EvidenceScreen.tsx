@@ -85,16 +85,27 @@ const EVIDENCES: Record<string, EvidenceRecord> = {
     adaptedMetrics: { loss: 1.16, bleu: 35.8, chrf: 59.1 },
     gitCommit: "66b02f0",
     completedAt: "2026-10-10T08:00:00Z",
-  }
+  },
 };
 
 export function EvidenceScreen() {
   const { activeLanguage } = useLanguage();
-  const record = EVIDENCES[activeLanguage.language_code] || EVIDENCES["igl"];
 
-  const bleuDiff = ((record.adaptedMetrics.bleu - record.baseMetrics.bleu) / record.baseMetrics.bleu) * 100;
+  if (!activeLanguage) {
+    return <p className="text-sm text-muted">Loading language…</p>;
+  }
+
+  const record = EVIDENCES[activeLanguage.code] || EVIDENCES["igl"];
+
+  const bleuDiff =
+    ((record.adaptedMetrics.bleu - record.baseMetrics.bleu) /
+      record.baseMetrics.bleu) *
+    100;
   const chrfDiff = record.adaptedMetrics.chrf - record.baseMetrics.chrf;
-  const lossDiff = ((record.baseMetrics.loss - record.adaptedMetrics.loss) / record.baseMetrics.loss) * 100;
+  const lossDiff =
+    ((record.baseMetrics.loss - record.adaptedMetrics.loss) /
+      record.baseMetrics.loss) *
+    100;
 
   return (
     <div className="space-y-6">
@@ -105,7 +116,8 @@ export function EvidenceScreen() {
             Verification Evidence: {record.language} ({record.languageCode})
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Immutable provenance, automated quality audit, and human validation gate record.
+            Immutable provenance, automated quality audit, and human validation
+            gate record.
           </p>
         </div>
       </div>
@@ -149,7 +161,9 @@ export function EvidenceScreen() {
           <ul className="mt-4 space-y-2.5">
             <li className="flex items-center justify-between text-sm">
               <span className="text-muted">Raw Ingested Records</span>
-              <span className="font-semibold tabular-nums">{record.totalRecords.toLocaleString()}</span>
+              <span className="font-semibold tabular-nums">
+                {record.totalRecords.toLocaleString()}
+              </span>
             </li>
             <li className="flex items-center justify-between text-sm">
               <span className="text-muted">Duplicates Filtered</span>
@@ -164,7 +178,9 @@ export function EvidenceScreen() {
               </span>
             </li>
             <li className="flex items-center justify-between border-t border-border pt-2 text-sm">
-              <span className="font-medium text-foreground">Clean Validated Rows</span>
+              <span className="font-medium text-foreground">
+                Clean Validated Rows
+              </span>
               <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
                 {record.cleanRecords.toLocaleString()}
               </span>
@@ -191,7 +207,8 @@ export function EvidenceScreen() {
               </span>
             </div>
             <p className="mt-2 text-xs text-muted leading-relaxed">
-              Native Igala speaker verification ({record.humanReviewApproved} / {record.humanReviewTotal} samples approved).
+              Native Igala speaker verification ({record.humanReviewApproved} /{" "}
+              {record.humanReviewTotal} samples approved).
             </p>
           </div>
           <div className="mt-6 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
@@ -210,9 +227,13 @@ export function EvidenceScreen() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {/* BLEU */}
           <div className="rounded-lg border border-border bg-surface-muted p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">BLEU Score</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+              BLEU Score
+            </p>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-sm line-through text-muted">{record.baseMetrics.bleu}</span>
+              <span className="text-sm line-through text-muted">
+                {record.baseMetrics.bleu}
+              </span>
               <span className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
                 {record.adaptedMetrics.bleu}
               </span>
@@ -224,9 +245,13 @@ export function EvidenceScreen() {
 
           {/* chrF */}
           <div className="rounded-lg border border-border bg-surface-muted p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">chrF++ Score</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+              chrF++ Score
+            </p>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-sm line-through text-muted">{record.baseMetrics.chrf}</span>
+              <span className="text-sm line-through text-muted">
+                {record.baseMetrics.chrf}
+              </span>
               <span className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
                 {record.adaptedMetrics.chrf}
               </span>
@@ -238,9 +263,13 @@ export function EvidenceScreen() {
 
           {/* Cross Entropy Loss */}
           <div className="rounded-lg border border-border bg-surface-muted p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Training Loss</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+              Training Loss
+            </p>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-sm line-through text-muted">{record.baseMetrics.loss}</span>
+              <span className="text-sm line-through text-muted">
+                {record.baseMetrics.loss}
+              </span>
               <span className="text-2xl font-bold tabular-nums text-accent">
                 {record.adaptedMetrics.loss}
               </span>
@@ -256,10 +285,17 @@ export function EvidenceScreen() {
       <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between text-xs">
         <div className="space-y-1">
           <p className="text-muted">
-            Hardware: <span className="font-semibold text-foreground">{record.hardware}</span>
+            Hardware:{" "}
+            <span className="font-semibold text-foreground">
+              {record.hardware}
+            </span>
           </p>
           <p className="text-muted">
-            Adapter: <span className="font-semibold text-foreground">{record.adapterMethod}</span> (Rank {record.loraRank}, Alpha {record.loraAlpha})
+            Adapter:{" "}
+            <span className="font-semibold text-foreground">
+              {record.adapterMethod}
+            </span>{" "}
+            (Rank {record.loraRank}, Alpha {record.loraAlpha})
           </p>
         </div>
         <div className="flex items-center gap-3">

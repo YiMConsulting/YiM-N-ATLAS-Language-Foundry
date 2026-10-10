@@ -1,6 +1,8 @@
- import type { Metadata } from "next";
+import type { Metadata } from "next";
+import { Suspense } from "react";
 import { AddLanguageButton } from "@/components/languages/add-language-button";
 import { LanguageList } from "@/components/languages/language-list";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getLanguages } from "@/lib/api/language";
 
 export const metadata: Metadata = {
@@ -8,11 +10,7 @@ export const metadata: Metadata = {
   description: "Languages registered in the N-ATLAS Language Foundry.",
 };
 
-export const dynamic = "force-dynamic";
-
-export default async function LanguagesPage() {
-  const { items } = await getLanguages();
-
+export default function LanguagesPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -25,11 +23,19 @@ export default async function LanguagesPage() {
         <AddLanguageButton />
       </div>
 
-      {items.length === 0 ? (
-        <p className="text-sm text-muted">No languages registered yet.</p>
-      ) : (
-        <LanguageList languages={items} />
-      )}
+      <Suspense fallback={<Skeleton className="h-40" />}>
+        <LanguagesSection />
+      </Suspense>
     </div>
   );
+}
+
+async function LanguagesSection() {
+  const { items } = await getLanguages();
+
+  if (items.length === 0) {
+    return <p className="text-sm text-muted">No languages registered yet.</p>;
+  }
+
+  return <LanguageList languages={items} />;
 }

@@ -1,17 +1,26 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isNotFound } from "@/lib/api/errors";
 import { StatusBadge } from "@/components/languages/status-badge";
-import { getLanguage } from "@/lib/api/language";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getLanguage, getLanguages } from "@/lib/api/language";
 import type { Language } from "@/lib/languages";
 
 type LanguagePageProps = {
   params: Promise<{ code: string }>;
 };
 
-export const dynamic = "force-dynamic";
+function formatDate(iso: string): string {
+  const date = new Date(iso);
+  const weekday = date.toLocaleDateString("en-GB", { weekday: "short" });
+  const day = date.getDate();
+  const month = date.toLocaleDateString("en-GB", { month: "short" });
+  const year = date.getFullYear();
+  return `${weekday} ${day} ${month}, ${year}`;
+}
 
 export async function generateMetadata({
   params,
@@ -30,9 +39,20 @@ export async function generateMetadata({
   }
 }
 
-export default async function LanguageDetailPage({
-  params,
-}: LanguagePageProps) {
+export async function generateStaticParams() {
+  const { items } = await getLanguages();
+  return items.map((language) => ({ code: language.code }));
+}
+
+export default function LanguageDetailPage({ params }: LanguagePageProps) {
+  return (
+    <Suspense fallback={<Skeleton className="h-96" />}>
+      <LanguageDetail params={params} />
+    </Suspense>
+  );
+}
+
+async function LanguageDetail({ params }: LanguagePageProps) {
   const { code } = await params;
 
   let language: Language | null = null;
@@ -68,18 +88,16 @@ export default async function LanguageDetailPage({
       </div>
 
       <dl className="overflow-hidden rounded-lg border border-border bg-surface">
+        <RecordRow label="ID" value={language.id} />
         <RecordRow label="Name" value={language.name} />
         <RecordRow label="ISO 639-3 code" value={language.code} />
-        <RecordRow label="Native name" value={language.native_name ?? "—"} />
         <RecordRow
           label="Status"
           value={<StatusBadge status={language.status} />}
         />
         <RecordRow label="Description" value={language.description ?? "—"} />
-        <RecordRow label="Created" value={language.created_at} />
-        {language.updated_at ? (
-          <RecordRow label="Updated" value={language.updated_at} />
-        ) : null}
+        <RecordRow label="Created" value={formatDate(language.created_at)} />
+        <RecordRow label="Updated" value={formatDate(language.updated_at)} />
       </dl>
     </div>
   );

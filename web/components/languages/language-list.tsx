@@ -2,6 +2,14 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/languages/status-badge";
 import type { Language } from "@/lib/languages";
 
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export function LanguageList({ languages }: { languages: Language[] }) {
   return (
     <>
@@ -11,14 +19,14 @@ export function LanguageList({ languages }: { languages: Language[] }) {
           <thead>
             <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted">
               <th className="px-4 py-3 font-medium">Language</th>
-              <th className="px-4 py-3 font-medium">Native name</th>
               <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium">Updated</th>
             </tr>
           </thead>
           <tbody>
             {languages.map((language) => (
               <tr
-                key={language.code}
+                key={language.id}
                 className="border-b border-border last:border-0"
               >
                 <td className="px-4 py-3">
@@ -30,11 +38,11 @@ export function LanguageList({ languages }: { languages: Language[] }) {
                   </Link>
                   <div className="text-xs text-muted">{language.code}</div>
                 </td>
-                <td className="px-4 py-3 text-muted">
-                  {language.native_name ?? "—"}
-                </td>
                 <td className="px-4 py-3">
                   <StatusBadge status={language.status} />
+                </td>
+                <td className="px-4 py-3 text-muted">
+                  {formatDate(language.updated_at)}
                 </td>
               </tr>
             ))}
@@ -45,7 +53,7 @@ export function LanguageList({ languages }: { languages: Language[] }) {
       {/* Cards — mobile */}
       <ul className="grid gap-4 md:hidden">
         {languages.map((language) => (
-          <li key={language.code}>
+          <li key={language.id}>
             <Link
               href={`/languages/${language.code}`}
               className="block rounded-lg border border-border bg-surface p-4 transition-colors hover:border-accent/40"
@@ -58,7 +66,7 @@ export function LanguageList({ languages }: { languages: Language[] }) {
                 <StatusBadge status={language.status} />
               </div>
               <p className="mt-3 text-sm text-muted">
-                {language.native_name ?? "—"}
+                Updated {formatDate(language.updated_at)}
               </p>
             </Link>
           </li>

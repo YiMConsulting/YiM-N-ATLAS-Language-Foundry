@@ -3,33 +3,33 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Select } from "@/components/ui/select";
-import { experiments } from "@/lib/experiments";
+import { experiments } from "@/lib/mocks/experiments";
+import { generate } from "@/lib/api/generate";
+import { isMockMode } from "@/lib/api/mock";
 import { playgroundSamples } from "@/lib/playground";
 import type { PlaygroundSample } from "@/lib/playground";
 
 type Status = "idle" | "loading" | "done";
 
+type Outputs = {
+  base?: string;
+  adapted?: string;
+  latencyMs?: number;
+};
+
 export function Playground() {
-  const [experimentId, setExperimentId] = useState(
-    experiments[0]?.experiment_id ?? "",
-  );
+  const mockMode = isMockMode();
+  const [experimentId, setExperimentId] = useState(experiments[0]?.id ?? "");
   const [prompt, setPrompt] = useState("");
   const [status, setStatus] = useState<Status>("idle");
-  const [outputs, setOutputs] = useState<{
-    base: string;
-    adapted: string;
-  } | null>(null);
+  const [outputs, setOutputs] = useState<Outputs | null>(null);
 
-  const currentExperiment = experiments.find(
-    (exp) => exp.experiment_id === experimentId,
-  );
+  const currentExperiment = experiments.find((exp) => exp.id === experimentId);
+  const languageCode = currentExperiment?.language_code ?? "igl";
+  const targetLanguageName = languageCode === "yor" ? "Yoruba" : "Igala";
 
-  const isYoruba = experimentId.includes("yor");
-  const targetLanguageName = isYoruba ? "Yoruba" : "Igala";
-
-  // Filter or prioritize samples matching the selected language
-  const relevantSamples = playgroundSamples.filter((sample) =>
-    isYoruba ? sample.language === "yor" : sample.language === "igl",
+  const relevantSamples = playgroundSamples.filter(
+    (sample) => sample.language === languageCode,
   );
 
   const run = async () => {
@@ -38,45 +38,45 @@ export function Playground() {
       return;
     }
 
-    const sample = playgroundSamples.find((item) => item.prompt === prompt);
-    if (sample) {
+    if (mockMode) {
+      const sample = playgroundSamples.find((item) => item.prompt === prompt);
+      if (!sample) {
+        toast.info("No recorded output for this prompt.");
+        return;
+      }
+
       setStatus("loading");
       setOutputs(null);
       window.setTimeout(() => {
-        setOutputs({ base: sample.base_output, adapted: sample.adapted_output });
+        setOutputs({
+          base: sample.base_output,
+          adapted: sample.adapted_output,
+        });
         setStatus("done");
       }, 500);
       return;
     }
 
-    // Try live backend generation
     setStatus("loading");
     setOutputs(null);
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/v1/playground/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt,
-          language_code: isYoruba ? "yor" : "igl",
-          experiment_id: experimentId,
-        }),
+      const response = await generate({
+        prompt,
+        language_code: languageCode,
+        experiment_id: experimentId,
+        max_new_tokens: 64,
+        do_sample: false,
       });
-      if (res.ok) {
-        const data = await res.json();
-        setOutputs({
-          base: data.base_output,
-          adapted: data.adapted_output,
-        });
-        setStatus("done");
-        return;
-      }
+      setOutputs({
+        base: response.base_output,
+        adapted: response.adapted_output,
+        latencyMs: response.latency_ms,
+      });
+      setStatus("done");
     } catch {
-      // Backend offline
+      toast.error("Inference unavailable — model executor not connected.");
+      setStatus("idle");
     }
-
-    toast.info("No recorded output found for custom un-cached prompt.");
-    setStatus("idle");
   };
 
   const chooseSample = (sample: PlaygroundSample) => {
@@ -94,12 +94,14 @@ export function Playground() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-        <span className="text-sm font-medium">Selected Adapter Experiment:</span>
+        <span className="text-sm font-medium">
+          Selected Adapter Experiment:
+        </span>
         <div className="w-64">
           <Select
             options={experiments.map((experiment) => ({
-              value: experiment.experiment_id,
-              label: `${experiment.experiment_id} (${experiment.language.split(" ")[0]})`,
+              value: experiment.id,
+              label: `${experiment.id} (${experiment.language_code})`,
             }))}
             value={experimentId}
             onChange={changeExperiment}
@@ -107,7 +109,7 @@ export function Playground() {
           />
         </div>
         <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent">
-          Active: {currentExperiment?.language ?? targetLanguageName}
+          Active: {targetLanguageName}
         </span>
       </div>
 
@@ -129,7 +131,11 @@ export function Playground() {
             disabled={status === "loading"}
             className="inline-flex items-center justify-center rounded-md bg-accent px-5 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {status === "loading" ? "Running Inference…" : "Run Comparison"}
+            {status === "loading"
+              ? "Running…"
+              : mockMode
+                ? "Run Comparison"
+                : "Generate"}
           </button>
         </div>
       </section>
@@ -144,7 +150,7 @@ export function Playground() {
               key={sample.id}
               type="button"
               onClick={() => chooseSample(sample)}
-              className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-muted hover:border-accent/40"
+              className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:bg-surface-muted"
             >
               {sample.prompt}
             </button>
@@ -158,8 +164,14 @@ export function Playground() {
             Outputs Comparison
           </h3>
           {status === "done" ? (
-            <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-              Evaluated side-by-side
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                mockMode
+                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                  : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+              }`}
+            >
+              {mockMode ? "Recorded outputs" : "Live inference"}
             </span>
           ) : null}
         </div>
@@ -177,6 +189,12 @@ export function Playground() {
             highlight
           />
         </div>
+
+        {!mockMode && outputs?.latencyMs != null ? (
+          <p className="mt-3 text-xs text-muted">
+            Latency {outputs.latencyMs.toFixed(0)} ms
+          </p>
+        ) : null}
       </section>
     </div>
   );
@@ -201,15 +219,13 @@ function OutputPanel({
           : "border-border bg-surface-muted"
       }`}
     >
-      <div className="flex items-center justify-between">
-        <h4
-          className={`text-xs font-semibold uppercase tracking-wider ${
-            highlight ? "text-accent" : "text-muted"
-          }`}
-        >
-          {title}
-        </h4>
-      </div>
+      <h4
+        className={`text-xs font-semibold uppercase tracking-wider ${
+          highlight ? "text-accent" : "text-muted"
+        }`}
+      >
+        {title}
+      </h4>
 
       <div className="mt-3 min-h-[90px] text-sm">
         {loading ? (
@@ -217,11 +233,13 @@ function OutputPanel({
             <span className="animate-pulse">Generating translation…</span>
           </div>
         ) : text ? (
-          <p className="whitespace-pre-wrap font-medium text-foreground leading-relaxed">
+          <p className="whitespace-pre-wrap font-medium leading-relaxed text-foreground">
             {text}
           </p>
         ) : (
-          <p className="text-muted italic">Click 'Run Comparison' to observe model generation.</p>
+          <p className="italic text-muted">
+            Click Run to observe model generation.
+          </p>
         )}
       </div>
     </div>

@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isNotFound } from "@/lib/api/errors";
 import { ProvenanceCard } from "@/components/datasets/provenance-card";
 import { QualityAuditCard } from "@/components/datasets/quality-audit-card";
 import { SplitBar } from "@/components/datasets/split-bar";
-import { getDataset, getQualityAudit } from "@/lib/api/datasets";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getDataset, getDatasets, getQualityAudit } from "@/lib/api/datasets";
 import type { Dataset, QualityAudit } from "@/lib/datasets";
 
 type DatasetPageProps = {
   params: Promise<{ id: string }>;
 };
-
-export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -31,7 +31,20 @@ export async function generateMetadata({
   }
 }
 
-export default async function DatasetDetailPage({ params }: DatasetPageProps) {
+export async function generateStaticParams() {
+  const { items } = await getDatasets();
+  return items.map((dataset) => ({ id: dataset.id }));
+}
+
+export default function DatasetDetailPage({ params }: DatasetPageProps) {
+  return (
+    <Suspense fallback={<Skeleton className="h-96" />}>
+      <DatasetDetail params={params} />
+    </Suspense>
+  );
+}
+
+async function DatasetDetail({ params }: DatasetPageProps) {
   const { id } = await params;
 
   let dataset: Dataset | null = null;

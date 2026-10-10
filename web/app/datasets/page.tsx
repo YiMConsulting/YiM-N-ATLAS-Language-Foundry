@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { DatasetList } from "@/components/datasets/dataset-list";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getDatasets } from "@/lib/api/datasets";
 
 export const metadata: Metadata = {
@@ -7,11 +9,7 @@ export const metadata: Metadata = {
   description: "Datasets registered in the N-ATLAS Language Foundry.",
 };
 
-export const dynamic = "force-dynamic";
-
-export default async function DatasetsPage() {
-  const { items } = await getDatasets();
-
+export default function DatasetsPage() {
   return (
     <div className="space-y-6">
       <div>
@@ -21,11 +19,19 @@ export default async function DatasetsPage() {
         </p>
       </div>
 
-      {items.length === 0 ? (
-        <p className="text-sm text-muted">No datasets registered yet.</p>
-      ) : (
-        <DatasetList datasets={items} />
-      )}
+      <Suspense fallback={<Skeleton className="h-40" />}>
+        <DatasetsSection />
+      </Suspense>
     </div>
   );
+}
+
+async function DatasetsSection() {
+  const { items } = await getDatasets();
+
+  if (items.length === 0) {
+    return <p className="text-sm text-muted">No datasets registered yet.</p>;
+  }
+
+  return <DatasetList datasets={items} />;
 }
