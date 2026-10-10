@@ -1,0 +1,125 @@
+# 🧪 N-ATLAS Language Foundry — External Beta Tester Pack
+## Problem Statement 1 (Developer Infrastructure) Beta Evaluation
+
+> **Participant Notice:** Thank you for participating in the external beta validation for the **N-ATLAS Language Foundry** (National AI Innovation Challenge 2026). Your feedback directly validates the practical utility and robustness of this infrastructure for extending N-ATLaS to Nigeria's underserved languages.
+
+---
+
+## 🔗 Quick Access & Demo Links
+
+Testers and developers can access the live system through the following demo links:
+
+* **Live Review Portal Demo:** [http://localhost:3000/review](http://localhost:3000/review)
+  * *Standalone fallback preview:* Open [`web/review_preview.html`](../web/review_preview.html) directly in any modern browser.
+* **Main Foundry Web Dashboard:** [http://localhost:3000](http://localhost:3000)
+  * *Languages Registry:* [http://localhost:3000/languages](http://localhost:3000/languages)
+  * *Datasets & Ingestion:* [http://localhost:3000/datasets](http://localhost:3000/datasets)
+  * *Experiments & Training:* [http://localhost:3000/experiments](http://localhost:3000/experiments)
+  * *Interactive Playground:* [http://localhost:3000/playground](http://localhost:3000/playground)
+* **Evidence & Provenance Hub:** [http://localhost:3000/evidence](http://localhost:3000/evidence)
+* **FastAPI Backend (Live Control Plane):** [http://localhost:8000](http://localhost:8000)
+* **Interactive API Documentation (Swagger UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
+* **Official GitHub Repository:** [https://github.com/YiMConsulting/YiM-N-ATLAS-Language-Foundry](https://github.com/YiMConsulting/YiM-N-ATLAS-Language-Foundry)
+
+---
+
+## 📋 Evaluation Overview
+
+* **Laboratory Language:** Igala (`igl`)
+* **Base Model:** `NCAIR1/N-ATLaS` (8B BF16)
+* **Goal:** Test the developer tools, data audit pipeline, human review portal, and LoRA adapter generation for real-world usability and linguistic validity.
+* **Testing Duration:** ~25–30 minutes per tester.
+
+---
+
+## 👤 Tester Profile & Assignment
+
+### Tester 1: NLP / Linguistic Evaluator (Igala Specialist or NLP Researcher)
+* **Focus:** Data quality audit, Igala orthography & tone diacritics, review portal usability, and baseline vs. adapted translation accuracy.
+* **Assigned Tasks:** Tasks 1, 2, and 4 below.
+
+### Tester 2: AI Developer / Software Engineer
+* **Focus:** Repository clone, environment reproducibility, FastAPI endpoint consumption, and CLI execution.
+* **Assigned Tasks:** Tasks 1, 3, and 5 below.
+
+---
+
+## 🛠️ Step-by-Step Testing Tasks
+
+### Task 1: Environment & Repository First Impressions (5 mins)
+1. Visit the repository: [https://github.com/YiMConsulting/YiM-N-ATLAS-Language-Foundry](https://github.com/YiMConsulting/YiM-N-ATLAS-Language-Foundry)
+2. Review the `README.md` and `docs/api_contract.md`.
+3. **Question to Answer:** Is the setup process, architecture, and licensing clearly explained?
+
+---
+
+### Task 2: Linguistic Audit & Review Portal Evaluation (10 mins)
+1. Open the **Igala Review Portal** at [http://localhost:3000/review](http://localhost:3000/review) (or `web/review_preview.html`).
+2. Observe the **"Live FastAPI Connected (:8000)"** green status badge confirming live synchronization with James's backend endpoints.
+3. Inspect the bilingual card pairs (English source ↔ Igala candidate).
+4. Evaluate 3–5 samples:
+   - Try the **Approved**, **Needs Correction**, and **Rejected** buttons.
+   - Use the **Igala Diacritic Toolbar** (`ẹ`, `ọ`, `ñ`, `á`, `à`, etc.) to tweak an orthographic sentence.
+   - Verify that the progress bar, statistics badges, and approval percentage update live.
+5. Click **"Submit Audit Batch"** and inspect the returned response payload confirming persistence.
+6. **Question to Answer:** Does the diacritic toolbar and review flow make it easy for an indigenous language expert to audit data without specialized software?
+
+---
+
+### Task 3: API & CLI Pipeline Execution (10 mins)
+1. Start the backend API:
+   ```powershell
+   uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
+   ```
+2. Open Swagger Docs at [http://localhost:8000/docs](http://localhost:8000/docs).
+3. Execute the `GET /api/v1/languages` and `GET /api/v1/experiments/exp-igl-lora-v1` endpoints.
+4. Test review submission endpoint: `POST /api/v1/review/submit` or `POST /review/decisions`.
+5. Run the automated test suite:
+   ```powershell
+   pytest tests/
+   ```
+6. **Question to Answer:** Did the endpoints respond as described in the API contract? Were all tests passing?
+
+---
+
+### Task 4: Base vs. Adapted Model Quality Comparison (5 mins)
+1. Open the **Results & Experiments** dashboard at [http://localhost:3000/experiments](http://localhost:3000/experiments).
+2. Compare the output of the unmodified `NCAIR1/N-ATLaS` baseline versus the LoRA-adapted model on 3 test prompts.
+3. **Question to Answer:** Did the LoRA-adapted model produce more grammatically natural Igala translations and better tone markings?
+
+---
+
+### Task 5: Interactive Playground (5 mins)
+1. In the Web UI at [http://localhost:3000/playground](http://localhost:3000/playground) or via `POST /api/v1/playground/generate`, submit a custom English prompt (e.g., *"Welcome to our home"* or *"Water brings life"*).
+2. Observe latency and generated Igala text.
+3. **Question to Answer:** How intuitive is the playground for developers seeking to test the model on their custom inputs?
+
+---
+
+## 📝 Tester Feedback Form
+
+*Please complete this section upon completing your testing tasks:*
+
+```markdown
+### Beta Tester Information
+- Name / Initials: __________________________________________________
+- Background / Role: [ ] NLP Researcher  [ ] Software Dev  [ ] Igala Speaker / Linguist  [ ] Student
+- Date & Time Tested: _______________________________________________
+
+### Usability & Quality Scores (1 to 5, where 5 = Excellent)
+- Documentation & Setup Clarity: [ ] 1  [ ] 2  [ ] 3  [ ] 4  [ ] 5
+- Review Portal Ease of Use:     [ ] 1  [ ] 2  [ ] 3  [ ] 4  [ ] 5
+- Diacritic & Orthography Tools: [ ] 1  [ ] 2  [ ] 3  [ ] 4  [ ] 5
+- API Simplicity & Reliability:  [ ] 1  [ ] 2  [ ] 3  [ ] 4  [ ] 5
+- Noticeable Igala Improvement:  [ ] 1  [ ] 2  [ ] 3  [ ] 4  [ ] 5
+
+### Qualitative Feedback
+1. What was the smoothest part of the Foundry workflow?
+   > [Your response here]
+
+2. What bug, friction point, or confusion did you encounter?
+   > [Your response here]
+
+3. One suggestion to make this pipeline even better for other Nigerian languages:
+   > [Your response here]
+```

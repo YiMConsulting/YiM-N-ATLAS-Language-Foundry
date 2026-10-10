@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🇳🇬 Igala Review Portal — N-ATLAS Language Foundry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #111827;
+      --card-border: #1f2937;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.2);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      padding: 32px 16px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* Top banner */
+    .header-banner {
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #064e3b 100%);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 28px 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #7dd3fc;
+      margin-bottom: 12px;
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #fff;
+    }
+
+    .subheading {
+      color: #94a3b8;
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    .reviewer-box {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 10px 16px;
+      text-align: right;
+    }
+
+    .reviewer-label {
+      font-size: 11px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .reviewer-input {
+      background: transparent;
+      border: none;
+      border-bottom: 1px dashed var(--accent);
+      color: var(--accent);
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 14px;
+      text-align: right;
+      outline: none;
+      padding: 2px 4px;
+    }
+
+    /* Progress bar */
+    .progress-section {
+      margin-top: 24px;
+    }
+
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #cbd5e1;
+      margin-bottom: 8px;
+    }
+
+    .progress-bar-bg {
+      height: 8px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #38bdf8, #10b981);
+      border-radius: 999px;
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Review Card */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 30px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .badge-pill {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: #1e293b;
+      color: #cbd5e1;
+    }
+
+    .badge-domain {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    .bilingual-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px;
+      margin-bottom: 26px;
+    }
+
+    .pane {
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    .pane-en {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+    }
+
+    .pane-igl {
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .pane-title {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pane-en .pane-title { color: #94a3b8; }
+    .pane-igl .pane-title { color: #34d399; }
+
+    .pane-text {
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+
+    .pane-en .pane-text { color: #f1f5f9; }
+    .pane-igl .pane-text { color: #a7f3d0; }
+
+    /* Decision Buttons */
+    .decision-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #cbd5e1;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .decision-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .btn-decision {
+      padding: 16px;
+      border-radius: 12px;
+      background: #1e293b;
+      border: 2px solid transparent;
+      color: #94a3b8;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-decision:hover {
+      background: #273548;
+      color: #fff;
+    }
+
+    .btn-decision.active-approved {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: var(--success);
+      color: #34d399;
+      box-shadow: 0 0 16px rgba(16, 185, 129, 0.2);
+    }
+
+    .btn-decision.active-correction {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: var(--warning);
+      color: #fbbf24;
+      box-shadow: 0 0 16px rgba(245, 158, 11, 0.2);
+    }
+
+    .btn-decision.active-rejected {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: var(--danger);
+      color: #f87171;
+      box-shadow: 0 0 16px rgba(239, 68, 68, 0.2);
+    }
+
+    /* Diacritic toolbar */
+    .diacritic-box {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .diacritic-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .diacritic-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #cbd5e1;
+    }
+
+    .diacritic-hint {
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .diacritic-keyboard {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .key-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .key-btn:hover {
+      background: var(--accent);
+      color: #0b0f19;
+      transform: translateY(-1px);
+    }
+
+    .input-field {
+      width: 100%;
+      background: #090d16;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: #f8fafc;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 500;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-field:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    /* Navigation */
+    .card-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 20px;
+      border-top: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .btn-nav {
+      padding: 10px 20px;
+      border-radius: 10px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #f1f5f9;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-nav:hover:not(:disabled) {
+      background: #334155;
+    }
+
+    .btn-nav:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .pager-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .dot-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #1e293b;
+      border: none;
+      color: #94a3b8;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .dot-btn.current {
+      outline: 2px solid var(--accent);
+      color: #fff;
+    }
+
+    .dot-btn.state-approved { background: var(--success); color: #fff; }
+    .dot-btn.state-correction { background: var(--warning); color: #000; }
+    .dot-btn.state-rejected { background: var(--danger); color: #fff; }
+
+    /* Bottom summary */
+    .bottom-bar {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 22px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 18px;
+    }
+
+    .btn-submit {
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 14px 28px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(16, 185, 129, 0.35);
+      transition: all 0.2s;
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(16, 185, 129, 0.45);
+    }
+
+    .btn-submit:disabled {
+      background: #334155;
+      color: #64748b;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    /* Modal / Payload Box */
+    .payload-card {
+      margin-top: 24px;
+      background: #022c22;
+      border: 1px solid #059669;
+      border-radius: 16px;
+      padding: 24px;
+      display: none;
+    }
+
+    pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: #011910;
+      padding: 16px;
+      border-radius: 10px;
+      color: #6ee7b7;
+      overflow-x: auto;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Top Banner -->
+  <div class="header-banner">
+    <div class="header-badge">
+      <span>🇳🇬 NAIC 2026</span> • <span>Stage 5: Human Linguistic Audit</span>
+    </div>
+    <div class="header-top">
+      <div>
+        <h1>Igala Language Review Portal</h1>
+        <div class="subheading">Native linguistic validation pipeline for N-ATLaS adapter training data</div>
+      </div>
+      <div class="reviewer-box">
+        <div class="reviewer-label">Reviewer Identity</div>
+        <input type="text" id="reviewerId" class="reviewer-input" value="Reviewer-Igala-01" />
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-section">
+      <div class="progress-labels">
+        <span>Audit Progress: <strong id="progressText">0 of 8</strong> reviewed (<span id="progressPct">0%</span>)</span>
+        <span>Approval Rate: <strong id="approvalRateText">0%</strong></span>
+      </div>
+      <div class="progress-bar-bg">
+        <div id="progressBar" class="progress-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Review Card -->
+  <div class="card">
+    <div class="card-meta">
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <span class="badge-pill" id="samplePaging">Sample 1 of 8</span>
+        <span class="badge-pill" style="font-family: monospace;" id="sampleId">igl_001</span>
+        <span class="badge-pill badge-domain" id="sampleDomain">Daily Greetings</span>
+      </div>
+      <div style="font-size: 13px; color: var(--text-muted);">
+        Quality Model Confidence: <strong id="sampleConf" style="color: var(--accent);">96%</strong>
+      </div>
+    </div>
+
+    <!-- Bilingual Grid -->
+    <div class="bilingual-grid">
+      <div class="pane pane-en">
+        <div class="pane-title">🇬🇧 English (Source)</div>
+        <div class="pane-text" id="sourceText">Good morning, how did you wake up?</div>
+      </div>
+      <div class="pane pane-igl">
+        <div class="pane-title">🇳🇬 Igala (Target Candidate)</div>
+        <div class="pane-text" id="targetText">Ólódù, áwá k'ọ̀chọ̀?</div>
+      </div>
+    </div>
+
+    <!-- Decisions -->
+    <span class="decision-label">Linguistic Audit Decision:</span>
+    <div class="decision-grid">
+      <button type="button" class="btn-decision" id="btnApproved" onclick="setDecision('approved')">
+        ✅ Approved (Accurate)
+      </button>
+      <button type="button" class="btn-decision" id="btnCorrection" onclick="setDecision('needs_correction')">
+        ✏️ Needs Correction
+      </button>
+      <button type="button" class="btn-decision" id="btnRejected" onclick="setDecision('rejected')">
+        ❌ Rejected (Invalid)
+      </button>
+    </div>
+
+    <!-- Diacritic Toolbar / Correction Box -->
+    <div class="diacritic-box" id="correctionBox">
+      <div class="diacritic-header">
+        <span class="diacritic-title">Igala Orthography Tweak / Canonical Diacritics:</span>
+        <span class="diacritic-hint">Click character to insert at cursor</span>
+      </div>
+      <div class="diacritic-keyboard" id="keyRow">
+        <!-- Rendered by JS -->
+      </div>
+      <input type="text" id="correctionInput" class="input-field" placeholder="Adjust Igala text with correct tone marks..." />
+    </div>
+
+    <!-- Comment Input -->
+    <div style="margin-bottom: 24px;">
+      <label class="decision-label">Linguistic Notes / Justification (optional):</label>
+      <input type="text" id="commentInput" class="input-field" placeholder="e.g. Tone diacritic mark on 'ọ' adjusted; idiomatic greeting verified." />
+    </div>
+
+    <!-- Card Navigation -->
+    <div class="card-nav">
+      <button type="button" class="btn-nav" id="btnPrev" onclick="navigate(-1)">← Previous</button>
+      <div class="pager-dots" id="dotsContainer"></div>
+      <button type="button" class="btn-nav" id="btnNext" onclick="navigate(1)">Next →</button>
+    </div>
+  </div>
+
+  <!-- Bottom Bar -->
+  <div class="bottom-bar">
+    <div>
+      <div style="font-size: 15px; font-weight: 700;">
+        Batch Summary: <span id="summaryText">0 Approved • 0 Corrected • 0 Rejected</span>
+      </div>
+      <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+        Target: Section 11 Compliance & Training Dataset Ingestion for Igala LoRA
+      </div>
+    </div>
+    <button type="button" class="btn-submit" id="btnSubmit" disabled onclick="submitBatch()">
+      💾 Submit Audit Batch (POST /api/reviews/submit)
+    </button>
+  </div>
+
+  <!-- Output Payload -->
+  <div class="payload-card" id="payloadCard">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="color: #6ee7b7; font-size: 16px;">🎉 Review Batch Successfully Recorded!</h3>
+      <span style="font-size: 12px; color: #a7f3d0;" id="timestampText"></span>
+    </div>
+    <p style="color: #a7f3d0; font-size: 13px; margin-top: 6px;">
+      Audited payload conforming to Section 3.4 of the API contract ready for dataset splitting and LoRA training.
+    </p>
+    <pre id="payloadOutput"></pre>
+  </div>
+</div>
+
+<script>
+  const SAMPLES = [
+    { sample_id: 'igl_001', source_text: 'Good morning, how did you wake up?', target_text: "Ólódù, áwá k'ọ̀chọ̀?", domain: 'Daily Greetings', confidence_score: 0.96 },
+    { sample_id: 'igl_002', source_text: 'Thank you very much for your help.', target_text: "Agbá nyo nyo kw'úkọ̀lọ̀ ẹ.", domain: 'Courtesy & Respect', confidence_score: 0.94 },
+    { sample_id: 'igl_003', source_text: 'Water is essential for life in every home.', target_text: "Omi ch'ényi kw'ùyí kpamkpa.", domain: 'Health & Nature', confidence_score: 0.89 },
+    { sample_id: 'igl_004', source_text: 'Where are the children going today?', target_text: "Ilí k'ámọ́ma lẹ k'ólóñ?", domain: 'Community & Family', confidence_score: 0.91 },
+    { sample_id: 'igl_005', source_text: 'The farmer went to harvest yams this morning.', target_text: "Ọnẹ úkọ̀lọ̀ lo k'uchu ẹgbá ólódù.", domain: 'Agriculture & Livelihood', confidence_score: 0.88 },
+    { sample_id: 'igl_006', source_text: 'Peace and unity bring strength to our people.', target_text: "Ufẹ kpai ọ̀gbọ̀gbẹ n'ọ́kpá kw'ámẹne wa.", domain: 'Culture & Proverbs', confidence_score: 0.85 },
+    { sample_id: 'igl_007', source_text: 'May God protect and bless your family.', target_text: "Ọjọ kọ̀ bi ámẹne ùyí ẹ.", domain: 'Blessings & Faith', confidence_score: 0.98 },
+    { sample_id: 'igl_008', source_text: 'The market will open early tomorrow.', target_text: "Ah'ịa lẹ a k'ọ́na gégé unana.", domain: 'Commerce & Market', confidence_score: 0.87 }
+  ];
+
+  const SPECIAL_CHARS = ['ẹ', 'ọ', 'ñ', 'á', 'à', 'é', 'è', 'í', 'ì', 'ó', 'ò', 'ú', 'ù', 'Gb', 'Kp'];
+
+  let currentIndex = 0;
+  let decisions = {};
+
+  // Build keyboard
+  const keyRow = document.getElementById('keyRow');
+  SPECIAL_CHARS.forEach(char => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'key-btn';
+    btn.innerText = char;
+    btn.onclick = () => insertChar(char);
+    keyRow.appendChild(btn);
+  });
+
+  function insertChar(char) {
+    const input = document.getElementById('correctionInput');
+    const start = input.selectionStart || input.value.length;
+    const end = input.selectionEnd || input.value.length;
+    input.value = input.value.substring(0, start) + char + input.value.substring(end);
+    input.focus();
+    input.setSelectionRange(start + char.length, start + char.length);
+    saveCurrentInputs();
+  }
+
+  function renderCard() {
+    const sample = SAMPLES[currentIndex];
+    document.getElementById('samplePaging').innerText = `Sample ${currentIndex + 1} of ${SAMPLES.length}`;
+    document.getElementById('sampleId').innerText = sample.sample_id;
+    document.getElementById('sampleDomain').innerText = sample.domain;
+    document.getElementById('sampleConf').innerText = `${Math.round(sample.confidence_score * 100)}%`;
+    document.getElementById('sourceText').innerText = sample.source_text;
+    document.getElementById('targetText').innerText = sample.target_text;
+
+    const saved = decisions[sample.sample_id] || { decision: null, comment: '', correction: sample.target_text };
+    document.getElementById('correctionInput').value = saved.correction !== undefined ? saved.correction : sample.target_text;
+    document.getElementById('commentInput').value = saved.comment || '';
+
+    // Update decision buttons
+    document.getElementById('btnApproved').className = 'btn-decision' + (saved.decision === 'approved' ? ' active-approved' : '');
+    document.getElementById('btnCorrection').className = 'btn-decision' + (saved.decision === 'needs_correction' ? ' active-correction' : '');
+    document.getElementById('btnRejected').className = 'btn-decision' + (saved.decision === 'rejected' ? ' active-rejected' : '');
+
+    // Nav buttons
+    document.getElementById('btnPrev').disabled = (currentIndex === 0);
+    document.getElementById('btnNext').disabled = (currentIndex === SAMPLES.length - 1);
+
+    renderDots();
+    updateStats();
+  }
+
+  function renderDots() {
+    const container = document.getElementById('dotsContainer');
+    container.innerHTML = '';
+    SAMPLES.forEach((s, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'dot-btn' + (idx === currentIndex ? ' current' : '');
+      const dec = decisions[s.sample_id]?.decision;
+      if (dec === 'approved') btn.classList.add('state-approved');
+      if (dec === 'needs_correction') btn.classList.add('state-correction');
+      if (dec === 'rejected') btn.classList.add('state-rejected');
+      btn.innerText = idx + 1;
+      btn.onclick = () => { currentIndex = idx; renderCard(); };
+      container.appendChild(btn);
+    });
+  }
+
+  function saveCurrentInputs() {
+    const sample = SAMPLES[currentIndex];
+    if (!decisions[sample.sample_id]) {
+      decisions[sample.sample_id] = { decision: 'approved', comment: '', correction: sample.target_text };
+    }
+    decisions[sample.sample_id].correction = document.getElementById('correctionInput').value;
+    decisions[sample.sample_id].comment = document.getElementById('commentInput').value;
+    updateStats();
+  }
+
+  document.getElementById('correctionInput').addEventListener('input', saveCurrentInputs);
+  document.getElementById('commentInput').addEventListener('input', saveCurrentInputs);
+
+  function setDecision(type) {
+    const sample = SAMPLES[currentIndex];
+    if (!decisions[sample.sample_id]) {
+      decisions[sample.sample_id] = { decision: type, comment: '', correction: sample.target_text };
+    } else {
+      decisions[sample.sample_id].decision = type;
+    }
+    saveCurrentInputs();
+    renderCard();
+  }
+
+  function navigate(dir) {
+    saveCurrentInputs();
+    currentIndex = Math.max(0, Math.min(SAMPLES.length - 1, currentIndex + dir));
+    renderCard();
+  }
+
+  function updateStats() {
+    const total = SAMPLES.length;
+    const reviewed = Object.keys(decisions).length;
+    let approved = 0, correction = 0, rejected = 0;
+    Object.values(decisions).forEach(d => {
+      if (d.decision === 'approved') approved++;
+      if (d.decision === 'needs_correction') correction++;
+      if (d.decision === 'rejected') rejected++;
+    });
+
+    const pct = Math.round((reviewed / total) * 100);
+    const approvalRate = reviewed > 0 ? Math.round((approved / reviewed) * 100) : 0;
+
+    document.getElementById('progressText').innerText = `${reviewed} of ${total}`;
+    document.getElementById('progressPct').innerText = `${pct}%`;
+    document.getElementById('progressBar').style.width = `${pct}%`;
+    document.getElementById('approvalRateText').innerText = `${approvalRate}%`;
+    document.getElementById('approvalRateText').style.color = approvalRate >= 80 ? '#10b981' : '#f87171';
+    document.getElementById('summaryText').innerText = `${approved} Approved • ${correction} Corrected • ${rejected} Rejected`;
+
+    document.getElementById('btnSubmit').disabled = (reviewed === 0);
+  }
+
+  function submitBatch() {
+    saveCurrentInputs();
+    const payload = {
+      dataset_id: "voiceafrica-igala-v1",
+      reviewer_id: document.getElementById('reviewerId').value || "Reviewer-Igala-01",
+      submitted_at: new Date().toISOString(),
+      decisions: Object.entries(decisions).map(([id, d]) => ({
+        sample_id: id,
+        decision: d.decision,
+        suggested_correction: d.correction,
+        comment: d.comment
+      }))
+    };
+
+    document.getElementById('timestampText').innerText = payload.submitted_at;
+    document.getElementById('payloadOutput').innerText = JSON.stringify(payload, null, 2);
+    document.getElementById('payloadCard').style.display = 'block';
+    document.getElementById('payloadCard').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // Initial render
+  renderCard();
+</script>
+
+</body>
+</html>
