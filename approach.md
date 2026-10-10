@@ -551,3 +551,80 @@ The unit tests cover sequence padding, tensor shapes and data types, preservatio
 - The observed loss is a smoke-test result, not evidence of improved Igala language performance.
 
 **Next Checkpoint:** Implement a reproducible training runner with optimizer updates, gradient accumulation, validation, checkpoint saving, and experiment artifact tracking.
+
+
+
+## Training Runner and Optimization Pipeline
+
+### Objective
+
+The training runner connects the verified preprocessing, batch collation, and LoRA model setup components into a reusable training workflow. It is responsible for optimizer updates, gradient accumulation, validation-loss evaluation, and saving training artifacts.
+
+The runner is implemented in `foundry/training/runner.py`, with its focused tests in `tests/test_natlas_training_runner.py`.
+
+### Training Workflow
+
+The runner follows this sequence:
+
+1. Validate the training configuration and dataloader requirements.
+2. Initialize reproducible training seeds.
+3. Configure the optimizer and learning-rate scheduler.
+4. Stream training batches without materializing the entire dataloader in memory.
+5. Compute supervised-token-weighted training loss.
+6. Accumulate gradients and perform optimizer updates, including when the final accumulation group contains fewer batches than the configured accumulation steps.
+7. Apply linear learning-rate warmup according to the configured `warmup_ratio`.
+8. Evaluate validation loss without updating model parameters.
+9. Save the training configuration, training metrics, and best adapter checkpoint.
+
+The training and validation dataloaders must be sized and re-iterable. Empty dataloaders and batches without supervised labels are rejected explicitly rather than silently producing misleading metrics.
+
+### Loss Calculation and Validation
+
+Training and validation losses are weighted by the number of supervised tokens. This avoids treating batches with different numbers of supervised tokens as if they contributed equally to the overall loss.
+
+Validation is intended to measure model performance without changing the model's parameters or existing gradients. The evaluation implementation also preserves the model's original training/evaluation mode.
+
+These safeguards support reliable training metrics and help prevent accidental interference with the optimization process.
+
+### Training Artifacts and Adapter Loading
+
+The runner saves the following artifacts:
+
+- `training_config.json` — the training configuration used for the run.
+- `training_metrics.json` — the recorded training and validation metrics.
+- `best_adapter/` — the saved best adapter checkpoint, written through the PEFT adapter-saving interface.
+
+A corresponding adapter-loading function is provided so a saved PEFT adapter can be loaded for subsequent evaluation or inference.
+
+These artifacts form the initial training-run output. They do not yet represent a complete experiment-tracking service or a verified improvement over the unadapted base model.
+
+### Verification and Test Evidence
+
+The training runner passed its focused unit-test suite, related regression tests, and the full backend test suite in the Docker-based ML test environment.
+
+Reported results:
+
+- Training runner tests: **7 passed**.
+- Related regression tests: **25 passed**.
+- Full backend test suite: **104 passed**.
+
+The tests cover parameter updates, artifact creation, streaming dataloader behavior, validation safeguards, empty dataloader rejection, one-shot generator rejection, and batches without supervised labels.
+
+The full backend test result provides evidence that the new runner remains compatible with the existing backend schemas, dataset utilities, and training components covered by the suite.
+
+### Current Limitations
+
+This checkpoint establishes the training runner's tested implementation, not the completion of a real N-ATLaS fine-tuning run.
+
+The following remain to be verified in the GPU environment:
+
+- Running optimizer updates on the actual N-ATLaS model using real prepared training data.
+- Completing a training run with validation and checkpoint selection.
+- Loading the saved adapter and comparing the adapted model against the unadapted base model on the same held-out test split.
+- Recording final evaluation metrics and determining whether adaptation improves performance on the target language.
+
+The existing LoRA GPU smoke test remains evidence of successful model setup and gradient flow, not evidence of completed training or improved Igala language quality.
+
+**Checkpoint status:** Training runner implementation and automated tests passed. Real-model training and comparative evaluation remain pending.
+
+**Next checkpoint:** Validate the runner against the real N-ATLaS model and prepared dataset in Kaggle, beginning with a controlled training run before attempting a larger experiment.

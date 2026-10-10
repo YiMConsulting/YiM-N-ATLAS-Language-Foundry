@@ -8,13 +8,11 @@ import random
 from pathlib import Path
 from typing import Any, Iterable
 
-
-
 from api.schemas.experiment import TrainingConfig
 
 
 def set_training_seed(seed: int) -> None:
-    """Python and PyTorch seeds for reproducible training."""
+    """Set Python and PyTorch random seeds."""
     random.seed(seed)
 
     try:
@@ -23,36 +21,50 @@ def set_training_seed(seed: int) -> None:
         raise RuntimeError("PyTorch is required for training.") from exc
 
     torch.manual_seed(seed)
-
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
 
-def _move_batch_to_device(batch: dict[str, Any], device: Any) -> dict[str, Any]:
-    """Move tensor values in a batch to the selected device."""
-    return {
-        key: value.to(device) if hasattr(value, "to") else value
-        for key, value in batch.items()
-    }
-
-
 def _model_device(model: Any) -> Any:
-    """Return the device of the first model parameter."""
+    """Return the device of the model's first parameter."""
     try:
         return next(model.parameters()).device
     except (AttributeError, StopIteration):
         raise ValueError("Model must expose at least one parameter.") from None
 
 
+def _move_batch_to_device(
+    batch: dict[str, Any],
+    device: Any,
+) -> dict[str, Any]:
+    """Move tensor-like batch values to the selected device."""
+    return {
+        key: value.to(device) if hasattr(value, "to") else value
+        for key, value in batch.items()
+    }
+
+
+def _supervised_token_count(batch: dict[str, Any]) -> int:
+    """Count labels that contribute to the loss."""
+    labels = batch.get("labels")
+    if labels is None:
+        raise ValueError("Every training and validation batch needs labels.")
+
+    count = int((labels != -100).sum().item())
+    if count == 0:
+        raise ValueError("Batch contains no supervised labels.")
+
+    return count
+
+
 def _validate_loss(loss: Any) -> float:
-    """Return a finite scalar loss or raise a clear error."""
+    """Validate that the model returned a finite scalar loss."""
     import torch
 
     if not torch.is_tensor(loss) or loss.numel() != 1:
         raise ValueError("Model must return a scalar tensor loss.")
 
     value = float(loss.detach().item())
-
     if not math.isfinite(value):
         raise ValueError(f"Model returned a non-finite loss: {value}")
 
@@ -65,7 +77,7 @@ def evaluate_loss(
     *,
     device: Any | None = None,
 ) -> float:
-    """Compute the mean validation loss without gradient updates."""
+    """Calculate supervised-token-weighted loss without gradient updates."""
     import torch
 
     if device is None:
@@ -74,8 +86,8 @@ def evaluate_loss(
     was_training = bool(model.training)
     model.eval()
 
-    total_loss = 0.0
-    batch_count = 0
+    weighted_loss = 0.0
+    supervised_tokens = 0
 
     try:
         with torch.no_grad():
@@ -83,19 +95,40 @@ def evaluate_loss(
                 if not batch:
                     raise ValueError("Validation batch cannot be empty.")
 
+                token_count = _supervised_token_count(batch)
                 inputs = _move_batch_to_device(batch, device)
                 outputs = model(**inputs)
                 loss_value = _validate_loss(outputs.loss)
 
-                total_loss += loss_value
-                batch_count += 1
+                weighted_loss += loss_value * token_count
+                supervised_tokens += token_count
     finally:
         model.train(was_training)
 
-    if batch_count == 0:
+    if supervised_tokens == 0:
         raise ValueError("Validation dataloader produced no batches.")
 
-    return total_loss / batch_count
+    return weighted_loss / supervised_tokens
+
+
+def _get_dataloader_length(dataloader: Any) -> int:
+    """Require a sized dataloader so accumulation and warmup are predictable."""
+    try:
+        count = len(dataloader)
+    except TypeError as exc:
+        raise ValueError(
+            "Training dataloader must implement __len__ and be re-iterable."
+        ) from exc
+
+    if count <= 0:
+        raise ValueError("Training dataloader produced no batches.")
+
+    if iter(dataloader) is dataloader:
+        raise ValueError(
+            "Training dataloader must be re-iterable across epochs."
+        )
+
+    return count
 
 
 def train_model(
@@ -108,25 +141,31 @@ def train_model(
     optimizer: Any | None = None,
     device: Any | None = None,
 ) -> dict[str, Any]:
-    """Train a model and save its best adapter checkpoint and metrics.
+    """Train a model and save the best adapter checkpoint and metrics.
 
-    The dataloaders must be re-iterable, such as PyTorch DataLoaders or lists.
+    The training dataloader must be sized and re-iterable, as with a standard
+    PyTorch DataLoader. Batches are streamed rather than materialized in memory.
     """
     import torch
+
+    if config.epochs <= 0:
+        raise ValueError("epochs must be greater than zero.")
+    if config.gradient_accumulation_steps <= 0:
+        raise ValueError(
+            "gradient_accumulation_steps must be greater than zero."
+        )
+    if not 0.0 <= config.warmup_ratio < 1.0:
+        raise ValueError("warmup_ratio must be in the range [0, 1).")
 
     if device is None:
         device = _model_device(model)
 
-    if config.epochs <= 0:
-        raise ValueError("epochs must be greater than zero.")
-
-    if config.gradient_accumulation_steps <= 0:
-        raise ValueError("gradient_accumulation_steps must be greater than zero.")
-
     set_training_seed(config.seed)
 
     trainable_parameters = [
-        parameter for parameter in model.parameters() if parameter.requires_grad
+        parameter
+        for parameter in model.parameters()
+        if parameter.requires_grad
     ]
     if not trainable_parameters:
         raise ValueError("Model has no trainable parameters.")
@@ -138,8 +177,32 @@ def train_model(
             weight_decay=config.weight_decay,
         )
 
+    batches_per_epoch = _get_dataloader_length(train_dataloader)
+    accumulation_steps = config.gradient_accumulation_steps
+    optimizer_steps_per_epoch = math.ceil(
+        batches_per_epoch / accumulation_steps
+    )
+    total_optimizer_steps = config.epochs * optimizer_steps_per_epoch
+    warmup_steps = math.ceil(total_optimizer_steps * config.warmup_ratio)
+
+    scheduler = None
+    if warmup_steps > 0:
+        def warmup_factor(step: int) -> float:
+            return min((step + 1) / warmup_steps, 1.0)
+
+        scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimizer,
+            lr_lambda=warmup_factor,
+        )
+
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
+
+    config_path = output_path / "training_config.json"
+    config_path.write_text(
+        json.dumps(config.model_dump(mode="json"), indent=2),
+        encoding="utf-8",
+    )
 
     history: list[dict[str, Any]] = []
     best_validation_loss = math.inf
@@ -149,51 +212,58 @@ def train_model(
         model.train()
         optimizer.zero_grad(set_to_none=True)
 
-        epoch_loss_total = 0.0
-        batch_count = 0
-        accumulation_count = 0
+        weighted_training_loss = 0.0
+        supervised_tokens = 0
+        batches_seen = 0
 
-        # Materialize this epoch so the final partial accumulation group can
-        # be scaled correctly without dropping its optimizer update.
-        batches = list(train_dataloader)
-        if not batches:
-            raise ValueError("Training dataloader produced no batches.")
-
-        for batch_index, batch in enumerate(batches):
+        # Stream batches. Use the known batch count to scale a final partial
+        # accumulation group by its actual size instead of dropping it.
+        for batch_index, batch in enumerate(train_dataloader):
             if not batch:
                 raise ValueError("Training batch cannot be empty.")
+            if batch_index >= batches_per_epoch:
+                raise RuntimeError(
+                    "Training dataloader yielded more batches than __len__."
+                )
 
+            token_count = _supervised_token_count(batch)
             inputs = _move_batch_to_device(batch, device)
             outputs = model(**inputs)
             loss = outputs.loss
             loss_value = _validate_loss(loss)
 
-            # Scale by the actual size of this accumulation group, including
-            # the final partial group.
             group_start = (
-                batch_index // config.gradient_accumulation_steps
-            ) * config.gradient_accumulation_steps
+                batch_index // accumulation_steps
+            ) * accumulation_steps
             group_size = min(
-                config.gradient_accumulation_steps,
-                len(batches) - group_start,
+                accumulation_steps,
+                batches_per_epoch - group_start,
             )
 
             (loss / group_size).backward()
 
-            epoch_loss_total += loss_value
-            batch_count += 1
-            accumulation_count += 1
+            weighted_training_loss += loss_value * token_count
+            supervised_tokens += token_count
+            batches_seen += 1
 
             should_step = (
-                accumulation_count == config.gradient_accumulation_steps
-                or batch_index == len(batches) - 1
+                (batch_index + 1) % accumulation_steps == 0
+                or batch_index + 1 == batches_per_epoch
             )
 
             if should_step:
                 optimizer.step()
+                if scheduler is not None:
+                    scheduler.step()
                 optimizer.zero_grad(set_to_none=True)
                 optimizer_steps += 1
-                accumulation_count = 0
+
+        if batches_seen != batches_per_epoch:
+            raise RuntimeError(
+                "Training dataloader yielded "
+                f"{batches_seen} batches, but __len__ reported "
+                f"{batches_per_epoch}."
+            )
 
         validation_loss = evaluate_loss(
             model,
@@ -203,35 +273,36 @@ def train_model(
 
         epoch_metrics = {
             "epoch": epoch + 1,
-            "training_loss": epoch_loss_total / batch_count,
+            "training_loss": weighted_training_loss / supervised_tokens,
             "validation_loss": validation_loss,
             "optimizer_steps": optimizer_steps,
+            "learning_rate": optimizer.param_groups[0]["lr"],
         }
         history.append(epoch_metrics)
 
         if validation_loss < best_validation_loss:
-            best_validation_loss = validation_loss
-            adapter_dir = output_path / "best_adapter"
-            adapter_dir.mkdir(parents=True, exist_ok=True)
-
             if not hasattr(model, "save_pretrained"):
                 raise TypeError(
                     "Model must implement save_pretrained() to save an adapter."
                 )
 
+            best_validation_loss = validation_loss
+            adapter_dir = output_path / "best_adapter"
+            adapter_dir.mkdir(parents=True, exist_ok=True)
             model.save_pretrained(adapter_dir)
 
             tokenizer = getattr(model, "tokenizer", None)
             if tokenizer is not None and hasattr(tokenizer, "save_pretrained"):
                 tokenizer.save_pretrained(adapter_dir)
 
-        # Write progress after each completed epoch so partial runs retain logs.
         metrics_path = output_path / "training_metrics.json"
         metrics_path.write_text(
             json.dumps(
                 {
                     "epochs_completed": len(history),
                     "optimizer_steps": optimizer_steps,
+                    "total_optimizer_steps": total_optimizer_steps,
+                    "warmup_steps": warmup_steps,
                     "best_validation_loss": best_validation_loss,
                     "history": history,
                 },
@@ -243,9 +314,12 @@ def train_model(
     return {
         "epochs_completed": len(history),
         "optimizer_steps": optimizer_steps,
+        "total_optimizer_steps": total_optimizer_steps,
+        "warmup_steps": warmup_steps,
         "best_validation_loss": best_validation_loss,
         "history": history,
         "adapter_path": str(output_path / "best_adapter"),
+        "config_path": str(config_path),
         "metrics_path": str(output_path / "training_metrics.json"),
     }
 

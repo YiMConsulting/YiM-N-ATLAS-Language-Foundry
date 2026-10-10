@@ -15,12 +15,20 @@ class TinyTrainableModel(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.linear = torch.nn.Linear(1, 1)
-        self.saved_paths = []
 
     def forward(self, input_ids, attention_mask=None, labels=None):
-        predictions = self.linear(input_ids.float().unsqueeze(-1)).squeeze(-1)
+        predictions = self.linear(
+            input_ids.float().unsqueeze(-1)
+        ).squeeze(-1)
+
         targets = labels.float()
-        loss = ((predictions - targets) ** 2).mean()
+        valid = targets.ne(-100)
+        safe_targets = targets.masked_fill(~valid, 0.0)
+
+        loss = (
+            ((predictions - safe_targets) ** 2 * valid).sum()
+            / valid.sum().clamp_min(1)
+        )
         return SimpleNamespace(loss=loss)
 
     def save_pretrained(self, path):
@@ -29,7 +37,6 @@ class TinyTrainableModel(torch.nn.Module):
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
         torch.save(self.state_dict(), path / "adapter_state.pt")
-        self.saved_paths.append(str(path))
 
 
 def make_batch(x, y):
@@ -38,6 +45,13 @@ def make_batch(x, y):
         "attention_mask": torch.tensor([[1]], dtype=torch.long),
         "labels": torch.tensor([[y]], dtype=torch.long),
     }
+
+
+def parameters_changed(before, model):
+    return any(
+        not torch.equal(old, new.detach())
+        for old, new in zip(before, model.parameters())
+    )
 
 
 def test_training_updates_parameters_and_saves_artifacts(tmp_path):
@@ -60,18 +74,20 @@ def test_training_updates_parameters_and_saves_artifacts(tmp_path):
             epochs=2,
             learning_rate=0.01,
             gradient_accumulation_steps=2,
+            warmup_ratio=0.25,
         ),
         output_dir=tmp_path,
     )
 
+    # Three batches per epoch and accumulation of two means two updates/epoch.
     assert result["epochs_completed"] == 2
-    # Three batches per epoch with accumulation of two means two updates/epoch.
     assert result["optimizer_steps"] == 4
-    assert any(
-        not torch.equal(before, after.detach())
-        for before, after in zip(initial_parameters, model.parameters())
-    )
+    assert result["total_optimizer_steps"] == 4
+    assert result["warmup_steps"] == 1
+    assert parameters_changed(initial_parameters, model)
+
     assert (tmp_path / "best_adapter" / "adapter_state.pt").exists()
+    assert (tmp_path / "training_config.json").exists()
     assert (tmp_path / "training_metrics.json").exists()
 
     metrics = json.loads(
@@ -79,12 +95,48 @@ def test_training_updates_parameters_and_saves_artifacts(tmp_path):
     )
     assert metrics["epochs_completed"] == 2
     assert len(metrics["history"]) == 2
+    assert "learning_rate" in metrics["history"][0]
 
 
-def test_evaluate_loss_does_not_change_parameters_or_gradients():
+def test_training_streams_batches_instead_of_materializing_them(tmp_path):
+    model = TinyTrainableModel()
+    initial_parameters = [
+        parameter.detach().clone() for parameter in model.parameters()
+    ]
+
+    class StreamingBatches:
+        def __len__(self):
+            return 2
+
+        def __iter__(self):
+            yield make_batch(1, 10)
+
+            # With accumulation=1, the first optimizer update must already
+            # have happened before the second batch is requested.
+            assert parameters_changed(initial_parameters, model)
+
+            yield make_batch(2, 20)
+
+    train_model(
+        model=model,
+        train_dataloader=StreamingBatches(),
+        validation_dataloader=[make_batch(1, 10)],
+        config=TrainingConfig(
+            epochs=1,
+            learning_rate=0.01,
+            gradient_accumulation_steps=1,
+        ),
+        output_dir=tmp_path,
+    )
+
+
+def test_evaluate_loss_preserves_parameters_gradients_and_mode():
     model = TinyTrainableModel()
     model.train()
-    before = [p.detach().clone() for p in model.parameters()]
+
+    before = [
+        parameter.detach().clone() for parameter in model.parameters()
+    ]
 
     loss = evaluate_loss(model, [make_batch(1, 2)])
 
@@ -115,3 +167,34 @@ def test_validation_rejects_empty_dataloader():
 
     with pytest.raises(ValueError, match="no batches"):
         evaluate_loss(model, [])
+
+
+def test_training_rejects_one_shot_generator(tmp_path):
+    model = TinyTrainableModel()
+
+    def batches():
+        yield make_batch(1, 2)
+
+    with pytest.raises(ValueError, match="re-iterable"):
+        train_model(
+            model=model,
+            train_dataloader=batches(),
+            validation_dataloader=[make_batch(1, 2)],
+            config=TrainingConfig(epochs=1),
+            output_dir=tmp_path,
+        )
+
+
+def test_training_rejects_batch_without_supervised_labels(tmp_path):
+    model = TinyTrainableModel()
+    batch = make_batch(1, 2)
+    batch["labels"][:] = -100
+
+    with pytest.raises(ValueError, match="no supervised labels"):
+        train_model(
+            model=model,
+            train_dataloader=[batch],
+            validation_dataloader=[make_batch(1, 2)],
+            config=TrainingConfig(epochs=1),
+            output_dir=tmp_path,
+        )
