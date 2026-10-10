@@ -1,12 +1,27 @@
 import Link from "next/link";
 import { ChangeValue } from "@/components/results/change-value";
-import type { ExperimentResult } from "@/lib/results";
+import type { Experiment } from "@/lib/experiments";
 
-function exactMatchChange(result: ExperimentResult) {
-  return result.metrics.find((metric) => metric.label === "Exact match");
+function exactMatchChange(experiment: Experiment): {
+  delta: number;
+  displayChange: string;
+} | null {
+  const base = experiment.base_results?.exact_match_ratio;
+  const adapted = experiment.adapted_results?.exact_match_ratio;
+
+  if (base == null || adapted == null) {
+    return null;
+  }
+
+  const delta = adapted - base;
+  const sign = delta > 0 ? "+" : "";
+  return {
+    delta,
+    displayChange: `${sign}${(delta * 100).toFixed(1)}%`,
+  };
 }
 
-export function ResultsList({ results }: { results: ExperimentResult[] }) {
+export function ResultsList({ experiments }: { experiments: Experiment[] }) {
   return (
     <>
       {/* Table — desktop and tablet */}
@@ -16,33 +31,39 @@ export function ResultsList({ results }: { results: ExperimentResult[] }) {
             <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted">
               <th className="px-4 py-3 font-medium">Experiment</th>
               <th className="px-4 py-3 font-medium">Language</th>
-              <th className="px-4 py-3 font-medium">Test examples</th>
               <th className="px-4 py-3 font-medium">Exact match change</th>
             </tr>
           </thead>
           <tbody>
-            {results.map((result) => {
-              const change = exactMatchChange(result);
+            {experiments.map((experiment) => {
+              const change = exactMatchChange(experiment);
 
               return (
                 <tr
-                  key={result.experiment_id}
+                  key={experiment.id}
                   className="border-b border-border last:border-0"
                 >
                   <td className="px-4 py-3">
                     <Link
-                      href={`/results/${result.experiment_id}`}
+                      href={`/results/${experiment.id}`}
                       className="font-medium transition-colors hover:text-accent"
                     >
-                      {result.experiment_id}
+                      {experiment.id}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-muted">{result.language}</td>
                   <td className="px-4 py-3 text-muted">
-                    {result.test_examples}
+                    {experiment.language_code}
                   </td>
                   <td className="px-4 py-3">
-                    {change ? <ChangeValue metric={change} /> : "—"}
+                    {change ? (
+                      <ChangeValue
+                        delta={change.delta}
+                        displayChange={change.displayChange}
+                        direction="higher"
+                      />
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 </tr>
               );
@@ -53,21 +74,27 @@ export function ResultsList({ results }: { results: ExperimentResult[] }) {
 
       {/* Cards — mobile */}
       <ul className="grid gap-4 md:hidden">
-        {results.map((result) => {
-          const change = exactMatchChange(result);
+        {experiments.map((experiment) => {
+          const change = exactMatchChange(experiment);
 
           return (
-            <li key={result.experiment_id}>
+            <li key={experiment.id}>
               <Link
-                href={`/results/${result.experiment_id}`}
+                href={`/results/${experiment.id}`}
                 className="block rounded-lg border border-border bg-surface p-4 transition-colors hover:border-accent/40"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="font-medium">{result.experiment_id}</div>
-                  {change ? <ChangeValue metric={change} /> : null}
+                  <div className="font-medium">{experiment.id}</div>
+                  {change ? (
+                    <ChangeValue
+                      delta={change.delta}
+                      displayChange={change.displayChange}
+                      direction="higher"
+                    />
+                  ) : null}
                 </div>
                 <p className="mt-2 text-sm text-muted">
-                  {result.language} · {result.test_examples} test examples
+                  {experiment.language_code}
                 </p>
               </Link>
             </li>

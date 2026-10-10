@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { DatasetList } from "@/components/datasets/dataset-list";
-import { datasets } from "@/lib/datasets";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getDatasets } from "@/lib/api/datasets";
 
 export const metadata: Metadata = {
   title: "Datasets | N-ATLAS Language Foundry",
@@ -17,7 +19,19 @@ export default function DatasetsPage() {
         </p>
       </div>
 
-      <DatasetList datasets={datasets} />
+      <Suspense fallback={<Skeleton className="h-40" />}>
+        <DatasetsSection />
+      </Suspense>
     </div>
   );
+}
+
+async function DatasetsSection() {
+  const { items } = await getDatasets();
+
+  if (items.length === 0) {
+    return <p className="text-sm text-muted">No datasets registered yet.</p>;
+  }
+
+  return <DatasetList datasets={items} />;
 }

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { ExperimentsList } from "@/components/experiments/experiments-list";
-import { experiments } from "@/lib/experiments";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getExperiments } from "@/lib/api/experiments";
 
 export const metadata: Metadata = {
   title: "Experiments | N-ATLAS Language Foundry",
@@ -17,7 +19,19 @@ export default function ExperimentsPage() {
         </p>
       </div>
 
-      <ExperimentsList experiments={experiments} />
+      <Suspense fallback={<Skeleton className="h-40" />}>
+        <ExperimentsSection />
+      </Suspense>
     </div>
   );
+}
+
+async function ExperimentsSection() {
+  const { items } = await getExperiments();
+
+  if (items.length === 0) {
+    return <p className="text-sm text-muted">No experiments recorded yet.</p>;
+  }
+
+  return <ExperimentsList experiments={items} />;
 }

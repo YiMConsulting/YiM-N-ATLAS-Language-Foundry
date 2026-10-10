@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { isNotFound } from "@/lib/api/errors";
 import { ProvenanceCard } from "@/components/datasets/provenance-card";
 import { QualityAuditCard } from "@/components/datasets/quality-audit-card";
 import { SplitBar } from "@/components/datasets/split-bar";
-import { datasets } from "@/lib/datasets";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getDataset, getDatasets, getQualityAudit } from "@/lib/api/datasets";
+import type { Dataset, QualityAudit } from "@/lib/datasets";
 
 type DatasetPageProps = {
   params: Promise<{ id: string }>;
@@ -14,25 +18,56 @@ export async function generateMetadata({
   params,
 }: DatasetPageProps): Promise<Metadata> {
   const { id } = await params;
-  const dataset = datasets.find((item) => item.dataset_id === id);
 
-  return {
-    title: dataset
-      ? `${dataset.name} | N-ATLAS Language Foundry`
-      : "Dataset | N-ATLAS Language Foundry",
-  };
+  try {
+    const dataset = await getDataset(id);
+    return {
+      title: `${dataset.name} | N-ATLAS Language Foundry`,
+    };
+  } catch {
+    return {
+      title: "Dataset | N-ATLAS Language Foundry",
+    };
+  }
 }
 
-export function generateStaticParams() {
-  return datasets.map((dataset) => ({ id: dataset.dataset_id }));
+export async function generateStaticParams() {
+  const { items } = await getDatasets();
+  return items.map((dataset) => ({ id: dataset.id }));
 }
 
-export default async function DatasetDetailPage({ params }: DatasetPageProps) {
+export default function DatasetDetailPage({ params }: DatasetPageProps) {
+  return (
+    <Suspense fallback={<Skeleton className="h-96" />}>
+      <DatasetDetail params={params} />
+    </Suspense>
+  );
+}
+
+async function DatasetDetail({ params }: DatasetPageProps) {
   const { id } = await params;
-  const dataset = datasets.find((item) => item.dataset_id === id);
+
+  let dataset: Dataset | null = null;
+  try {
+    dataset = await getDataset(id);
+  } catch (error) {
+    if (isNotFound(error)) {
+      notFound();
+    }
+    throw error;
+  }
 
   if (!dataset) {
     notFound();
+  }
+
+  let quality: QualityAudit | null = null;
+  try {
+    quality = await getQualityAudit(id);
+  } catch (error) {
+    if (!isNotFound(error)) {
+      throw error;
+    }
   }
 
   return (
@@ -49,16 +84,17 @@ export default async function DatasetDetailPage({ params }: DatasetPageProps) {
           {dataset.name}
         </h2>
         <p className="mt-1 text-sm text-muted">
-          {dataset.rows.toLocaleString()} rows · {dataset.license}
+          {dataset.record_count?.toLocaleString() ?? "—"} records ·{" "}
+          {dataset.format}
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <ProvenanceCard dataset={dataset} />
-        <QualityAuditCard quality={dataset.quality} />
+        <ProvenanceCard provenance={null} />
+        <QualityAuditCard quality={quality} />
       </div>
 
-      <SplitBar split={dataset.split} />
+      <SplitBar split={null} />
     </div>
   );
 }
