@@ -2,18 +2,33 @@
 from __future__ import annotations
 
 from typing import Any
+
 from api.schemas.experiment import AdaptationConfig, AdaptationMethod
 
 
-def attach_lora_adapters(model: Any, adaptation: AdaptationConfig) -> Any:
-    """
-    Validates target modules and attaches LoRA adapters to the model.
+def attach_lora_adapters(
+    model: Any,
+    adaptation: AdaptationConfig,
+) -> Any:
+    """Validate target modules and attach LoRA adapters to a model.
+
+    Standard models use the normal PEFT LoRA path. Models loaded in 8-bit
+    are prepared for k-bit training before LoRA adapters are attached.
+    The 4-bit QLoRA path remains unsupported.
     """
     if adaptation.method == AdaptationMethod.qlora:
         raise NotImplementedError(
-            "QLoRA requires a quantized model-loading path. "
-            "Use the LoRA method until that path is implemented and tested."
+            "QLoRA requires a tested 4-bit quantized model-loading path. "
+            "Use the LoRA method with an ordinary or supported 8-bit model."
         )
+
+    if getattr(model, "is_loaded_in_4bit", False):
+        raise NotImplementedError(
+            "4-bit model loading is not supported by the current LoRA "
+            "setup. Use an ordinary or supported 8-bit model."
+        )
+
+    is_loaded_in_8bit = getattr(model, "is_loaded_in_8bit", False)
 
     available_modules = {
         name.rsplit(".", 1)[-1]
@@ -31,11 +46,16 @@ def attach_lora_adapters(model: Any, adaptation: AdaptationConfig) -> Any:
 
     try:
         from peft import LoraConfig, get_peft_model
+        if is_loaded_in_8bit:
+            from peft import prepare_model_for_kbit_training
     except ImportError as exc:
         raise RuntimeError(
             "PEFT is required to attach LoRA adapters. "
             "Install the ML dependencies in the training environment."
         ) from exc
+
+    if is_loaded_in_8bit:
+        model = prepare_model_for_kbit_training(model)
 
     lora_config = LoraConfig(
         r=adaptation.rank,
@@ -45,19 +65,24 @@ def attach_lora_adapters(model: Any, adaptation: AdaptationConfig) -> Any:
         bias="none",
         task_type="CAUSAL_LM",
     )
+
     model.config.use_cache = False
     adapted_model = get_peft_model(model, lora_config)
+
     trainable_parameters = [
         name
         for name, parameter in adapted_model.named_parameters()
         if parameter.requires_grad
     ]
+
     if not trainable_parameters:
         raise RuntimeError(
             "LoRA attachment produced no trainable parameters."
         )
+
     if not any("lora_" in name for name in trainable_parameters):
         raise RuntimeError(
             "No trainable LoRA parameters were found after adapter setup."
         )
+
     return adapted_model

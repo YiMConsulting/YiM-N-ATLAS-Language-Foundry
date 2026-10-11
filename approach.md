@@ -763,3 +763,34 @@ The original source manifest and existing Igala artifacts remain unchanged. The 
 5. Incorporate qualified human-review findings before making final claims about dataset eligibility or translation quality.
 
 
+**Next Checkpoint:** Implement a reproducible training runner with optimizer updates, gradient accumulation, validation, checkpoint saving, and experiment artifact tracking."""
+
+#### 8-bit LoRA Setup Integration
+
+A subsequent model-loading experiment was performed in Google Colab after the FP16 loading attempt exceeded the available GPU memory.
+
+- **Base model:** `NCAIR1/N-ATLaS`
+- **GPU:** Tesla T4
+- **Loading precision:** 8-bit; `is_loaded_in_8bit=True` and `is_loaded_in_4bit=False`.
+- **Peak allocated GPU memory:** 9.24 GiB, as reported by the diagnostic check.
+- **Trainable parameters:** 6,815,744 out of 8,037,076,992 total parameters (~0.0848%).
+- **Smoke-test loss:** `7.475561141967773`.
+- **Gradient verification:** All 128 trainable LoRA tensors had gradients, and 64 had nonzero gradients for the tested batch.
+
+The initial Colab smoke test established finite loss and gradient propagation. Zero gradients on some `lora_A` tensors during the initial backward pass were consistent with common LoRA initialization behavior.
+
+The repository implementation in `foundry/training/model_setup.py` was then extended to call PEFT's `prepare_model_for_kbit_training()` for models identified as loaded in 8-bit, before attaching LoRA adapters. Standard non-quantized LoRA retains its existing path. The repository continues to reject the 4-bit QLoRA path until that path is implemented and tested.
+
+Automated verification:
+- Focused model-setup tests: **5 passed**.
+- Full test suite: **109 passed**.
+- Tests use mocked PEFT functions to verify setup behavior and ordering. They do not yet establish that the repository's updated setup function and training runner complete a real training run with the Colab model.
+
+#### Remaining Limitations
+
+- The repository's updated 8-bit setup has passed unit tests, but integration through that exact function with the real quantized model remains to be verified.
+- No optimizer update or complete real-data training run has been verified by this checkpoint.
+- The smoke-test loss is not evidence of improved Tiv translation quality.
+- Human linguistic review and source-license review remain outstanding for the exploratory Tiv dataset.
+
+**Next Checkpoint:** Validate the repository's model-setup function and existing training runner against the real 8-bit N-ATLaS model and prepared Tiv dataset. Begin with a controlled, small training run, verify optimizer updates, validation, and adapter checkpoint saving, and record the experiment configuration and artifacts.
