@@ -551,3 +551,246 @@ The unit tests cover sequence padding, tensor shapes and data types, preservatio
 - The observed loss is a smoke-test result, not evidence of improved Igala language performance.
 
 **Next Checkpoint:** Implement a reproducible training runner with optimizer updates, gradient accumulation, validation, checkpoint saving, and experiment artifact tracking.
+
+
+
+## Training Runner and Optimization Pipeline
+
+### Objective
+
+The training runner connects the verified preprocessing, batch collation, and LoRA model setup components into a reusable training workflow. It is responsible for optimizer updates, gradient accumulation, validation-loss evaluation, and saving training artifacts.
+
+The runner is implemented in `foundry/training/runner.py`, with its focused tests in `tests/test_natlas_training_runner.py`.
+
+### Training Workflow
+
+The runner follows this sequence:
+
+1. Validate the training configuration and dataloader requirements.
+2. Initialize reproducible training seeds.
+3. Configure the optimizer and learning-rate scheduler.
+4. Stream training batches without materializing the entire dataloader in memory.
+5. Compute supervised-token-weighted training loss.
+6. Accumulate gradients and perform optimizer updates, including when the final accumulation group contains fewer batches than the configured accumulation steps.
+7. Apply linear learning-rate warmup according to the configured `warmup_ratio`.
+8. Evaluate validation loss without updating model parameters.
+9. Save the training configuration, training metrics, and best adapter checkpoint.
+
+The training and validation dataloaders must be sized and re-iterable. Empty dataloaders and batches without supervised labels are rejected explicitly rather than silently producing misleading metrics.
+
+### Loss Calculation and Validation
+
+Training and validation losses are weighted by the number of supervised tokens. This avoids treating batches with different numbers of supervised tokens as if they contributed equally to the overall loss.
+
+Validation is intended to measure model performance without changing the model's parameters or existing gradients. The evaluation implementation also preserves the model's original training/evaluation mode.
+
+These safeguards support reliable training metrics and help prevent accidental interference with the optimization process.
+
+### Training Artifacts and Adapter Loading
+
+The runner saves the following artifacts:
+
+- `training_config.json` — the training configuration used for the run.
+- `training_metrics.json` — the recorded training and validation metrics.
+- `best_adapter/` — the saved best adapter checkpoint, written through the PEFT adapter-saving interface.
+
+A corresponding adapter-loading function is provided so a saved PEFT adapter can be loaded for subsequent evaluation or inference.
+
+These artifacts form the initial training-run output. They do not yet represent a complete experiment-tracking service or a verified improvement over the unadapted base model.
+
+### Verification and Test Evidence
+
+The training runner passed its focused unit-test suite, related regression tests, and the full backend test suite in the Docker-based ML test environment.
+
+Reported results:
+
+- Training runner tests: **7 passed**.
+- Related regression tests: **25 passed**.
+- Full backend test suite: **104 passed**.
+
+The tests cover parameter updates, artifact creation, streaming dataloader behavior, validation safeguards, empty dataloader rejection, one-shot generator rejection, and batches without supervised labels.
+
+The full backend test result provides evidence that the new runner remains compatible with the existing backend schemas, dataset utilities, and training components covered by the suite.
+
+### Current Limitations
+
+This checkpoint establishes the training runner's tested implementation, not the completion of a real N-ATLaS fine-tuning run.
+
+The following remain to be verified in the GPU environment:
+
+- Running optimizer updates on the actual N-ATLaS model using real prepared training data.
+- Completing a training run with validation and checkpoint selection.
+- Loading the saved adapter and comparing the adapted model against the unadapted base model on the same held-out test split.
+- Recording final evaluation metrics and determining whether adaptation improves performance on the target language.
+
+The existing LoRA GPU smoke test remains evidence of successful model setup and gradient flow, not evidence of completed training or improved Igala language quality.
+
+**Checkpoint status:** Training runner implementation and automated tests passed. Real-model training and comparative evaluation remain pending.
+
+**Next checkpoint:** Validate the runner against the real N-ATLaS model and prepared dataset in Kaggle, beginning with a controlled training run before attempting a larger experiment.
+
+
+
+
+## Initial Language Experiment: Tiv
+
+N-ATLAS Language Foundry is designed to support adaptation across Nigerian languages, rather than being tied to a single language.
+
+Igala was initially selected as the first experimental language. However, during data exploration, obtaining an accessible corpus suitable for the intended training and evaluation workflow proved difficult. We therefore shifted the initial experiment to Tiv after identifying candidate English–Tiv parallel data sources.
+
+This is a practical change to the first experiment, not a change in the Foundry's architecture or long-term scope.
+
+The Tiv pilot will help validate the complete workflow: dataset discovery, provenance tracking, automated quality auditing, human review, reproducible splitting, model adaptation, and baseline-versus-adapted evaluation. The resulting workflow should then be reusable for Igala and other Nigerian languages when suitable data becomes available.
+
+The identified Tiv datasets remain candidates until their provenance, licensing, quality, and suitability for the experiment have been reviewed.
+
+
+
+## Current Project Direction and Language Selection
+
+### Foundry Objective
+
+N-ATLaS Language Foundry is intended to provide a reusable, auditable workflow for adapting N-ATLaS to additional Nigerian languages. Its purpose is to make dataset preparation, quality control, human review, experiment management, training, and evaluation repeatable across languages.
+
+The Foundry is not intended to be a separate foundation model. Its value lies in the infrastructure and evidence surrounding adaptation: traceable data, reproducible experiments, comparable evaluations, and independently tracked adapters.
+
+### Change from Igala to Tiv
+
+Igala was the initial laboratory language considered during project planning. However, access to the researched Igala dataset corpus could not be obtained. The project therefore changed its initial adaptation experiment to Tiv, for which accessible candidate data sources were identified.
+
+This is a change in the pilot language, not in the Foundry's general architecture. The canonical dataset schema, quality auditing, human-review workflow, dataset builder, experiment contracts, and training pipeline must remain reusable across languages.
+
+The Tiv pilot currently considers two independent sources:
+
+- MT560: an English–Tiv parallel corpus.
+- Hypa Text-10k: a multilingual instruction dataset from which explicit English-to-Tiv candidates were extracted.
+
+The sources remain separate while provenance, licensing, structural quality, and translation accuracy are assessed. The recorded dataset revisions and declared licenses are preliminary provenance evidence, not a substitute for reviewing the actual license terms and source conditions.
+
+### Current Data and Review Status
+
+The initial structural audit found:
+
+- MT560: 184,113 loaded records, 391 exact duplicate pairs, and 3,116 repeated English inputs.
+- Hypa Text-10k: 103 explicit English-to-Tiv candidates, with six records flagged by the current heuristic review checks.
+
+Repeated English inputs are not automatically invalid. They may have different legitimate translations or occur in different contexts. Structural flags therefore identify records or groups requiring further inspection; they do not, by themselves, establish translation errors.
+
+Human reviewers will assess translation accuracy, meaning completeness, Tiv naturalness, and formatting. Review decisions must remain separate from the original source records.
+
+### Dataset Split Strategy Update
+
+The Dataset Builder supports two split strategies:
+
+- `random`: deterministic random splitting, retained as the default for backward compatibility.
+- `grouped_by_input`: deterministic splitting that keeps records with the same normalized input in one partition.
+
+The grouped strategy normalizes input text by collapsing whitespace, trimming surrounding whitespace, and applying case folding. It then assigns whole groups to partitions using a deterministic heuristic that minimizes incremental squared deviation from the target partition sizes.
+
+Grouped splitting may produce approximate rather than exact 75/10/15 proportions because groups must remain intact. It prevents normalized exact-input variants from crossing partitions, but does not detect semantic duplicates or all possible forms of data leakage.
+
+Automated regression tests cover the grouped behavior, and the full backend suite has passed 105 tests. These results validate the tested software behavior; they do not establish linguistic quality or successful model adaptation.
+
+
+### Tiv MT560 Dataset Build and Verification 
+
+#### Dataset Preparation
+
+The first reproducible Tiv dataset build has been completed using the MT560 English–Tiv parallel corpus. The source was pinned to Hugging Face revision `252074f0d4c82c0005099b5eb4043fddc43026f1`.
+
+The dataset builder was configured as follows:
+
+- Dataset ID: `tiv-mt560-v1`
+- Language code: `tiv`
+- Split strategy: `grouped_by_input`
+- Random seed: `42`
+- Train ratio: `0.75`
+- Validation ratio: `0.10`
+- Test ratio: `0.15`
+
+The builder processed 184,113 canonical source records, retained 184,099 records, and removed 14 duplicate records. No records were excluded by the builder's validation stage.
+
+#### Split Results
+
+| Partition | Records |
+|---|---:|
+| Train | 138,074 |
+| Validation | 18,410 |
+| Test | 27,615 |
+| Total retained | 184,099 |
+
+The builder generated `train.jsonl`, `validation.jsonl`, `test.jsonl`, and `split_metadata.json` under `data/processed/tiv-mt560-v1/`.
+
+#### Verification Evidence
+
+The following checks passed:
+
+- All expected split artifacts exist and can be read.
+- All records contain the canonical fields `id`, `input`, `target`, and `language_code`.
+- Required fields are non-empty strings, and every record uses the `tiv` language code.
+- Record IDs are unique across the three partitions.
+- Normalized English inputs do not overlap between train, validation, and test partitions.
+- The split metadata matches the expected dataset ID, split strategy, seed, ratios, and record counts.
+- The raw canonical dataset and provenance sidecar each contain 184,113 records with unique source-row indices.
+- Every retained processed record maps to its source canonical record and matches it exactly.
+- The 14 raw records not retained in the processed dataset account for the difference between the raw and retained record counts.
+
+These checks establish dataset structure, reproducible partition metadata, and record-level traceability. They do not establish translation accuracy, semantic deduplication, or complete absence of semantic data leakage.
+
+#### Source Review and Limitations
+
+The source manifest records CC BY 4.0 as the license declared by the MT560 dataset host and identifies OPUS MT560 as the upstream source. The applicable attribution requirements and upstream source conditions remain subject to review.
+
+The current structural audit identified potential quality-review candidates, including repeated English inputs, unusual length ratios, structured content, and possible page-reference mismatches. These flags are not automatic exclusions and do not prove that a translation is incorrect.
+
+Human linguistic review remains outstanding. The initial training run will therefore be treated as exploratory evidence rather than a fully validated Tiv translation adaptation.
+
+The Hypa Text-10k candidates remain separate from the initial MT560-only experiment pending linguistic review.
+
+#### Next Engineering Checkpoint
+
+Prepare a Tiv LoRA experiment configuration aligned with the existing Foundry experiment schemas and training runner. Prepare the train and validation inputs through the existing `DatasetRecord` and `NAtlasPreprocessor` path, evaluate the base model before adaptation, and compare it with the adapted model on the held-out test partition.
+
+The original source manifest and existing Igala artifacts remain unchanged. The source revision, dataset split ID, configuration, training results, and outstanding review limitations must be recorded for reproducibility.
+
+
+### Immediate Next Milestones
+
+1. Complete and review the documentation for the current data and splitting workflow.
+2. Add integration tests covering the complete dataset preparation path and verify that source identity and split isolation are preserved.
+3. Prepare a provisional MT560-only training experiment in Kaggle, keeping Hypa separate.
+4. Evaluate the unadapted base model and adapted model using the same held-out test partition.
+5. Incorporate qualified human-review findings before making final claims about dataset eligibility or translation quality.
+
+
+**Next Checkpoint:** Implement a reproducible training runner with optimizer updates, gradient accumulation, validation, checkpoint saving, and experiment artifact tracking."""
+
+#### 8-bit LoRA Setup Integration
+
+A subsequent model-loading experiment was performed in Google Colab after the FP16 loading attempt exceeded the available GPU memory.
+
+- **Base model:** `NCAIR1/N-ATLaS`
+- **GPU:** Tesla T4
+- **Loading precision:** 8-bit; `is_loaded_in_8bit=True` and `is_loaded_in_4bit=False`.
+- **Peak allocated GPU memory:** 9.24 GiB, as reported by the diagnostic check.
+- **Trainable parameters:** 6,815,744 out of 8,037,076,992 total parameters (~0.0848%).
+- **Smoke-test loss:** `7.475561141967773`.
+- **Gradient verification:** All 128 trainable LoRA tensors had gradients, and 64 had nonzero gradients for the tested batch.
+
+The initial Colab smoke test established finite loss and gradient propagation. Zero gradients on some `lora_A` tensors during the initial backward pass were consistent with common LoRA initialization behavior.
+
+The repository implementation in `foundry/training/model_setup.py` was then extended to call PEFT's `prepare_model_for_kbit_training()` for models identified as loaded in 8-bit, before attaching LoRA adapters. Standard non-quantized LoRA retains its existing path. The repository continues to reject the 4-bit QLoRA path until that path is implemented and tested.
+
+Automated verification:
+- Focused model-setup tests: **5 passed**.
+- Full test suite: **109 passed**.
+- Tests use mocked PEFT functions to verify setup behavior and ordering. They do not yet establish that the repository's updated setup function and training runner complete a real training run with the Colab model.
+
+#### Remaining Limitations
+
+- The repository's updated 8-bit setup has passed unit tests, but integration through that exact function with the real quantized model remains to be verified.
+- No optimizer update or complete real-data training run has been verified by this checkpoint.
+- The smoke-test loss is not evidence of improved Tiv translation quality.
+- Human linguistic review and source-license review remain outstanding for the exploratory Tiv dataset.
+
+**Next Checkpoint:** Validate the repository's model-setup function and existing training runner against the real 8-bit N-ATLaS model and prepared Tiv dataset. Begin with a controlled, small training run, verify optimizer updates, validation, and adapter checkpoint saving, and record the experiment configuration and artifacts.

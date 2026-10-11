@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, model_validator
 
 class SplitStrategy(str, Enum):
     random = "random"
+    grouped_by_input = "grouped_by_input"
 
 
 class DatasetSplit(BaseModel):
