@@ -1,0 +1,57 @@
+{
+  "experiment_id": "tiv-translation-pilot-v1",
+  "created_at_utc": "2026-10-10T19:42:30.916190+00:00",
+  "task": "English-to-Tiv translation",
+  "source_language_code": "en",
+  "target_language_code": "tiv",
+  "split_ratios": {
+    "train": 0.75,
+    "validation": 0.1,
+    "test": 0.15
+  },
+  "random_seed": 42,
+  "sources": {
+    "mt560": {
+      "dataset_id": "michsethowusu/english-tiv_sentence-pairs_mt560",
+      "requested_revision": "main",
+      "resolved_commit_sha": "252074f0d4c82c0005099b5eb4043fddc43026f1",
+      "declared_license": "cc-by-4.0",
+      "source_url": "https://huggingface.co/datasets/michsethowusu/english-tiv_sentence-pairs_mt560",
+      "split": "train",
+      "loaded_rows": 184113,
+      "audit": {
+        "missing_or_empty_text": 0,
+        "duplicate_pairs": 391,
+        "repeated_english_inputs": 3116,
+        "formatting_warnings": 0
+      },
+      "eligibility_status": "pending_source_review"
+    },
+    "hypa": {
+      "dataset_id": "hypaai/Hypa-Text-10k",
+      "requested_revision": "main",
+      "resolved_commit_sha": "7a442cf5b029fab79540b093c9ef9abae5e30e96",
+      "declared_license": "apache-2.0",
+      "source_url": "https://huggingface.co/datasets/hypaai/Hypa-Text-10k",
+      "split": "train",
+      "loaded_rows": 10000,
+      "explicit_en_to_tiv_candidates": 103,
+      "audit": {
+        "missing_or_empty_text": 0,
+        "duplicate_pairs": 0,
+        "repeated_english_inputs": 0,
+        "formatting_warnings": 0
+      },
+      "eligibility_status": "pending_linguistic_review"
+    }
+  },
+  "combination_status": "not_combined",
+  "split_status": "not_created",
+  "notes": [
+    "Structural checks do not establish translation accuracy.",
+    "Original source row identifiers must be preserved.",
+    "Repeated English inputs are not automatically excluded.",
+    "Dataset revisions must be pinned for reproducibility.",
+    "License metadata is declared by the dataset host and does not replace provenance review."
+  ]
+}

@@ -691,6 +691,69 @@ Grouped splitting may produce approximate rather than exact 75/10/15 proportions
 
 Automated regression tests cover the grouped behavior, and the full backend suite has passed 105 tests. These results validate the tested software behavior; they do not establish linguistic quality or successful model adaptation.
 
+
+### Tiv MT560 Dataset Build and Verification 
+
+#### Dataset Preparation
+
+The first reproducible Tiv dataset build has been completed using the MT560 English–Tiv parallel corpus. The source was pinned to Hugging Face revision `252074f0d4c82c0005099b5eb4043fddc43026f1`.
+
+The dataset builder was configured as follows:
+
+- Dataset ID: `tiv-mt560-v1`
+- Language code: `tiv`
+- Split strategy: `grouped_by_input`
+- Random seed: `42`
+- Train ratio: `0.75`
+- Validation ratio: `0.10`
+- Test ratio: `0.15`
+
+The builder processed 184,113 canonical source records, retained 184,099 records, and removed 14 duplicate records. No records were excluded by the builder's validation stage.
+
+#### Split Results
+
+| Partition | Records |
+|---|---:|
+| Train | 138,074 |
+| Validation | 18,410 |
+| Test | 27,615 |
+| Total retained | 184,099 |
+
+The builder generated `train.jsonl`, `validation.jsonl`, `test.jsonl`, and `split_metadata.json` under `data/processed/tiv-mt560-v1/`.
+
+#### Verification Evidence
+
+The following checks passed:
+
+- All expected split artifacts exist and can be read.
+- All records contain the canonical fields `id`, `input`, `target`, and `language_code`.
+- Required fields are non-empty strings, and every record uses the `tiv` language code.
+- Record IDs are unique across the three partitions.
+- Normalized English inputs do not overlap between train, validation, and test partitions.
+- The split metadata matches the expected dataset ID, split strategy, seed, ratios, and record counts.
+- The raw canonical dataset and provenance sidecar each contain 184,113 records with unique source-row indices.
+- Every retained processed record maps to its source canonical record and matches it exactly.
+- The 14 raw records not retained in the processed dataset account for the difference between the raw and retained record counts.
+
+These checks establish dataset structure, reproducible partition metadata, and record-level traceability. They do not establish translation accuracy, semantic deduplication, or complete absence of semantic data leakage.
+
+#### Source Review and Limitations
+
+The source manifest records CC BY 4.0 as the license declared by the MT560 dataset host and identifies OPUS MT560 as the upstream source. The applicable attribution requirements and upstream source conditions remain subject to review.
+
+The current structural audit identified potential quality-review candidates, including repeated English inputs, unusual length ratios, structured content, and possible page-reference mismatches. These flags are not automatic exclusions and do not prove that a translation is incorrect.
+
+Human linguistic review remains outstanding. The initial training run will therefore be treated as exploratory evidence rather than a fully validated Tiv translation adaptation.
+
+The Hypa Text-10k candidates remain separate from the initial MT560-only experiment pending linguistic review.
+
+#### Next Engineering Checkpoint
+
+Prepare a Tiv LoRA experiment configuration aligned with the existing Foundry experiment schemas and training runner. Prepare the train and validation inputs through the existing `DatasetRecord` and `NAtlasPreprocessor` path, evaluate the base model before adaptation, and compare it with the adapted model on the held-out test partition.
+
+The original source manifest and existing Igala artifacts remain unchanged. The source revision, dataset split ID, configuration, training results, and outstanding review limitations must be recorded for reproducibility.
+
+
 ### Immediate Next Milestones
 
 1. Complete and review the documentation for the current data and splitting workflow.
@@ -698,3 +761,5 @@ Automated regression tests cover the grouped behavior, and the full backend suit
 3. Prepare a provisional MT560-only training experiment in Kaggle, keeping Hypa separate.
 4. Evaluate the unadapted base model and adapted model using the same held-out test partition.
 5. Incorporate qualified human-review findings before making final claims about dataset eligibility or translation quality.
+
+
