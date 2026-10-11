@@ -1,105 +1,103 @@
-export type DatasetQualityStatus = "passed" | "needs_review" | "failed";
+export type DatasetFormat =
+  | "jsonl"
+  | "json"
+  | "csv"
+  | "tsv"
+  | "parquet"
+  | "txt";
 
-export type DatasetQuality = {
-  missing_values: number;
-  empty_records: number;
-  duplicates: number;
-  malformed_rows: number;
-  possible_non_language: number;
+export type DatasetSourceType =
+  | "research"
+  | "community"
+  | "institutional"
+  | "private";
+
+export type DatasetStatus =
+  | "registered"
+  | "provenance_checked"
+  | "audited"
+  | "reviewed"
+  | "ready"
+  | "rejected";
+
+export const datasetStatusLabels: Record<DatasetStatus, string> = {
+  registered: "Registered",
+  provenance_checked: "Provenance checked",
+  audited: "Audited",
+  reviewed: "Reviewed",
+  ready: "Ready",
+  rejected: "Rejected",
 };
 
-export type DatasetSplit = {
-  train: number;
-  validation: number;
-  test: number;
+export type DatasetProvenance = {
+  id: string;
+  source_name: string;
+  source_url: string | null;
+  license: string;
+  version: string | null;
+  published_at: string | null;
+  retrieved_at: string;
+  usage_allowed: boolean;
+  usage_notes: string | null;
+  checksum: string | null;
 };
 
 export type Dataset = {
-  dataset_id: string;
+  id: string;
+  language_code: string;
   name: string;
-  source: string;
-  license: string;
-  rows: number;
-  quality_status: DatasetQualityStatus;
-  intended_use_allowed: boolean;
-  source_url: string;
-  version_date: string;
-  manifest_hash: string;
-  split: DatasetSplit;
-  quality: DatasetQuality;
+  description: string | null;
+  format: DatasetFormat;
+  source_type: DatasetSourceType;
+  record_count: number | null;
+  local_path: string | null;
+  provenance_id: string;
+  version: string | null;
+  status: DatasetStatus;
+  created_at: string;
+  updated_at: string;
 };
 
-export const datasets: Dataset[] = [
-  {
-    dataset_id: "igl-parallel-v1",
-    name: "Igala Parallel Instructions V1",
-    source: "YiM Consulting & Community Native Speakers",
-    license: "CC-BY-4.0",
-    rows: 4850,
-    quality_status: "passed",
-    intended_use_allowed: true,
-    source_url: "https://huggingface.co/datasets/YiMConsulting/igala-instructions",
-    version_date: "2026-10-09",
-    manifest_hash: "sha256:d8a9f3b18c0e29d71c4fa4891bca7f9184b2c451",
-    split: {
-      train: 80,
-      validation: 10,
-      test: 10,
-    },
-    quality: {
-      missing_values: 0,
-      empty_records: 0,
-      duplicates: 0,
-      malformed_rows: 0,
-      possible_non_language: 0,
-    },
-  },
-  {
-    dataset_id: "yor-parallel-v1",
-    name: "Yoruba Audited Instruction Corpus V1",
-    source: "Masakhane & Verified Community Native Linguists",
-    license: "CC-BY-4.0",
-    rows: 15200,
-    quality_status: "passed",
-    intended_use_allowed: true,
-    source_url: "https://huggingface.co/datasets/masakhane/menyo-20k_mt",
-    version_date: "2026-10-10",
-    manifest_hash: "sha256:a4f891bca7f9184b2c451d8a9f3b18c0e29d71c4",
-    split: {
-      train: 80,
-      validation: 10,
-      test: 10,
-    },
-    quality: {
-      missing_values: 0,
-      empty_records: 0,
-      duplicates: 0,
-      malformed_rows: 0,
-      possible_non_language: 0,
-    },
-  },
-  {
-    dataset_id: "igl-monolingual-curated",
-    name: "Igala Monolingual Domain Corpus",
-    source: "Verified Oral & Written Igala Archives",
-    license: "Open Data Commons / CC-BY-4.0",
-    rows: 12400,
-    quality_status: "passed",
-    intended_use_allowed: true,
-    source_url: "https://huggingface.co/datasets/YiMConsulting/igala-monolingual",
-    version_date: "2026-10-08",
-    manifest_hash: "sha256:9c7e12b4501a18290fbbcd514210e7193c72b1aa",
-    split: {
-      train: 85,
-      validation: 10,
-      test: 5,
-    },
-    quality: {
-      missing_values: 0,
-      empty_records: 0,
-      duplicates: 4,
-      malformed_rows: 0,
-      possible_non_language: 0,
-    },
-  },
-];
+export type DatasetRecord = {
+  id: string;
+  input: string;
+  target: string;
+  language_code: string;
+};
+
+export type AuditStatus = "passed" | "warning" | "failed";
+
+export type QualityAudit = {
+  id: string;
+  dataset_id: string;
+  status: AuditStatus;
+  total_records: number;
+  valid_records: number;
+  empty_records: number;
+  malformed_records: number;
+  missing_required_fields: number;
+  duplicate_records: number;
+  duplicate_rate: number;
+  suspected_language_mismatches: number;
+  warnings: string[];
+  errors: string[];
+  audit_version: string;
+  audited_at: string;
+};
+
+export type SplitStrategy = "random";
+
+export type DatasetSplit = {
+  id: string;
+  dataset_id: string;
+  strategy: SplitStrategy;
+  seed: number;
+  train_ratio: number;
+  validation_ratio: number;
+  test_ratio: number;
+  total_records: number;
+  train_records: number;
+  validation_records: number;
+  test_records: number;
+  created_at: string;
+};

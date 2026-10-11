@@ -11,11 +11,11 @@ export function SetupCard({ experiment }: { experiment: Experiment }) {
         Setup
       </h3>
       <dl className="mt-3 divide-y divide-border">
-        <KvRow label="Language" value={experiment.language} />
+        <KvRow label="Language" value={experiment.language_code} />
         <KvRow label="Base model" value={baseModel} />
         <KvRow label="Dataset" value={experiment.dataset_ids[0]} />
-        <KvRow label="Hardware" value={experiment.hardware} />
-        <KvRow label="Seed" value={experiment.hyperparameters.seed} />
+        <KvRow label="Hardware" value={experiment.runtime.hardware} />
+        <KvRow label="Seed" value={experiment.training.seed} />
       </dl>
     </section>
   );
