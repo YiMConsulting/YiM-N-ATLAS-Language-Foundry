@@ -1,53 +1,104 @@
-import type { DatasetQuality } from "@/lib/datasets";
+import type { QualityAudit } from "@/lib/datasets";
 
-const checks: { key: keyof DatasetQuality; label: string }[] = [
-  { key: "missing_values", label: "Missing values" },
-  { key: "empty_records", label: "Empty records" },
-  { key: "duplicates", label: "Duplicates" },
-  { key: "malformed_rows", label: "Malformed rows" },
-  { key: "possible_non_language", label: "Possible non-Igala" },
-];
+type Tone = "good" | "warn" | "bad";
 
-function countColor(key: keyof DatasetQuality, value: number): string {
+const toneClass: Record<Tone, string> = {
+  good: "text-emerald-600 dark:text-emerald-300",
+  warn: "text-amber-600 dark:text-amber-300",
+  bad: "text-red-600 dark:text-red-300",
+};
+
+function toneFor(value: number, badWhenNonZero = false): Tone {
   if (value === 0) {
-    return "text-emerald-600 dark:text-emerald-300";
+    return "good";
   }
-  if (key === "possible_non_language") {
-    return "text-red-600 dark:text-red-300";
-  }
-  return "text-amber-600 dark:text-amber-300";
+  return badWhenNonZero ? "bad" : "warn";
 }
 
-export function QualityAuditCard({ quality }: { quality: DatasetQuality }) {
+export function QualityAuditCard({
+  quality,
+}: {
+  quality: QualityAudit | null;
+}) {
+  if (!quality) {
+    return (
+      <section className="rounded-lg border border-border bg-surface p-5">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
+          Quality audit
+        </h3>
+        <p className="mt-4 text-sm text-muted">No audit run yet.</p>
+      </section>
+    );
+  }
+
+  const rows: { label: string; value: number; tone: Tone }[] = [
+    { label: "Total records", value: quality.total_records, tone: "good" },
+    { label: "Valid records", value: quality.valid_records, tone: "good" },
+    {
+      label: "Empty records",
+      value: quality.empty_records,
+      tone: toneFor(quality.empty_records),
+    },
+    {
+      label: "Malformed records",
+      value: quality.malformed_records,
+      tone: toneFor(quality.malformed_records),
+    },
+    {
+      label: "Missing required fields",
+      value: quality.missing_required_fields,
+      tone: toneFor(quality.missing_required_fields),
+    },
+    {
+      label: "Duplicate records",
+      value: quality.duplicate_records,
+      tone: toneFor(quality.duplicate_records),
+    },
+    {
+      label: "Suspected language mismatches",
+      value: quality.suspected_language_mismatches,
+      tone: toneFor(quality.suspected_language_mismatches, true),
+    },
+  ];
+
   return (
     <section className="rounded-lg border border-border bg-surface p-5">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
-        Quality audit
-      </h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
+          Quality audit
+        </h3>
+        <span className="text-xs capitalize text-muted">
+          {quality.status} · {quality.audited_at}
+        </span>
+      </div>
 
       <ul className="mt-4 space-y-3">
-        {checks.map(({ key, label }) => {
-          const value = quality[key];
-
-          return (
-            <li key={key} className="flex items-center justify-between gap-4">
-              <span className="text-sm text-muted">{label}</span>
-              <span className="flex items-center gap-2">
-                <span
-                  className={`text-sm font-semibold tabular-nums ${countColor(key, value)}`}
-                >
-                  {value}
-                </span>
-                {key === "possible_non_language" && value > 0 ? (
-                  <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-300">
-                    flagged
-                  </span>
-                ) : null}
-              </span>
-            </li>
-          );
-        })}
+        {rows.map(({ label, value, tone }) => (
+          <li key={label} className="flex items-center justify-between gap-4">
+            <span className="text-sm text-muted">{label}</span>
+            <span
+              className={`text-sm font-semibold tabular-nums ${toneClass[tone]}`}
+            >
+              {value}
+            </span>
+          </li>
+        ))}
       </ul>
+
+      {quality.warnings.length > 0 || quality.errors.length > 0 ? (
+        <div className="mt-4 space-y-1 text-sm">
+          {quality.warnings.map((warning) => (
+            <p key={warning} className="text-amber-600 dark:text-amber-300">
+              {warning}
+            </p>
+          ))}
+          {quality.errors.map((error) => (
+            <p key={error} className="text-red-600 dark:text-red-300">
+              {error}
+            </p>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

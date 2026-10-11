@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { AddLanguageButton } from "@/components/languages/add-language-button";
 import { LanguageList } from "@/components/languages/language-list";
-import { languages } from "@/lib/languages";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getLanguages } from "@/lib/api/language";
 
 export const metadata: Metadata = {
   title: "Languages | N-ATLAS Language Foundry",
@@ -21,7 +23,19 @@ export default function LanguagesPage() {
         <AddLanguageButton />
       </div>
 
-      <LanguageList languages={languages} />
+      <Suspense fallback={<Skeleton className="h-40" />}>
+        <LanguagesSection />
+      </Suspense>
     </div>
   );
+}
+
+async function LanguagesSection() {
+  const { items } = await getLanguages();
+
+  if (items.length === 0) {
+    return <p className="text-sm text-muted">No languages registered yet.</p>;
+  }
+
+  return <LanguageList languages={items} />;
 }

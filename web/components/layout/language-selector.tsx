@@ -1,20 +1,19 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
-import { languages } from "@/lib/languages";
 import { useLanguage } from "@/components/layout/language-provider";
 
 export function LanguageSelector() {
-  const { activeLanguage, setActiveLanguageByCode } = useLanguage();
+  const { languages, activeLanguage, setActiveLanguageByCode } = useLanguage();
 
   return (
     <div className="w-32">
       <Select
         options={languages.map((language) => ({
-          value: language.language_code,
+          value: language.code,
           label: language.name,
         }))}
-        value={activeLanguage.language_code}
+        value={activeLanguage?.code ?? ""}
         onChange={setActiveLanguageByCode}
         ariaLabel="Select language"
       />

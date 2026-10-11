@@ -23,7 +23,11 @@ export function MetricsTable({ metrics }: { metrics: ResultMetric[] }) {
               <td className="px-4 py-3 text-muted">{metric.base}</td>
               <td className="px-4 py-3 text-muted">{metric.adapted}</td>
               <td className="px-4 py-3">
-                <ChangeValue metric={metric} />
+                <ChangeValue
+                  delta={metric.delta}
+                  displayChange={metric.displayChange}
+                  direction={metric.direction}
+                />
               </td>
             </tr>
           ))}

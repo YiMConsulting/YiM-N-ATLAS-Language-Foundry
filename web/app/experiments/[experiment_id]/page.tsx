@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { LossChart } from "@/components/experiments/loss-chart";
+import { isNotFound } from "@/lib/api/errors";
 import { SetupCard } from "@/components/experiments/setup-card";
 import { StatusBadge } from "@/components/experiments/status-badge";
 import { TrainingSettingsCard } from "@/components/experiments/training-settings-card";
-import { experiments } from "@/lib/experiments";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getExperiment, getExperiments } from "@/lib/api/experiments";
+import type { Experiment } from "@/lib/experiments";
 
 type ExperimentPageProps = {
   params: Promise<{ experiment_id: string }>;
@@ -23,30 +26,44 @@ export async function generateMetadata({
   params,
 }: ExperimentPageProps): Promise<Metadata> {
   const { experiment_id } = await params;
-  const experiment = experiments.find(
-    (item) => item.experiment_id === experiment_id,
+
+  try {
+    const experiment = await getExperiment(experiment_id);
+    return {
+      title: `${experiment.id} | N-ATLAS Language Foundry`,
+    };
+  } catch {
+    return {
+      title: "Experiment | N-ATLAS Language Foundry",
+    };
+  }
+}
+
+export async function generateStaticParams() {
+  const { items } = await getExperiments();
+  return items.map((experiment) => ({ experiment_id: experiment.id }));
+}
+
+export default function ExperimentDetailPage({ params }: ExperimentPageProps) {
+  return (
+    <Suspense fallback={<Skeleton className="h-96" />}>
+      <ExperimentDetail params={params} />
+    </Suspense>
   );
-
-  return {
-    title: experiment
-      ? `${experiment.experiment_id} | N-ATLAS Language Foundry`
-      : "Experiment | N-ATLAS Language Foundry",
-  };
 }
 
-export function generateStaticParams() {
-  return experiments.map((experiment) => ({
-    experiment_id: experiment.experiment_id,
-  }));
-}
-
-export default async function ExperimentDetailPage({
-  params,
-}: ExperimentPageProps) {
+async function ExperimentDetail({ params }: ExperimentPageProps) {
   const { experiment_id } = await params;
-  const experiment = experiments.find(
-    (item) => item.experiment_id === experiment_id,
-  );
+
+  let experiment: Experiment | null = null;
+  try {
+    experiment = await getExperiment(experiment_id);
+  } catch (error) {
+    if (isNotFound(error)) {
+      notFound();
+    }
+    throw error;
+  }
 
   if (!experiment) {
     notFound();
@@ -64,11 +81,11 @@ export default async function ExperimentDetailPage({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">
-            {experiment.experiment_id}
+            {experiment.id}
           </h2>
           <p className="mt-1 text-sm text-muted">
             Created {formatDate(experiment.created_at)} · commit{" "}
-            {experiment.git_commit}
+            {experiment.git_commit ?? "—"}
           </p>
         </div>
         <StatusBadge status={experiment.status} />
@@ -79,26 +96,17 @@ export default async function ExperimentDetailPage({
         <TrainingSettingsCard experiment={experiment} />
       </div>
 
-      <section className="rounded-lg border border-border bg-surface p-5">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
-          Training loss
-        </h3>
-        <div className="mt-4">
-          <LossChart data={experiment.loss} />
-        </div>
-      </section>
-
       <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted">
             Adapter path
           </p>
           <p className="mt-1 truncate text-sm font-medium">
-            {experiment.adapter_path}
+            {experiment.artifacts.adapter_path ?? "—"}
           </p>
         </div>
         <Link
-          href={`/results/${experiment.experiment_id}`}
+          href={`/results/${experiment.id}`}
           className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
         >
           View results →
