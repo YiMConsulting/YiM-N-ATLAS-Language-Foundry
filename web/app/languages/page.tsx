@@ -20,7 +20,7 @@ export default function LanguagesPage() {
             Languages registered in the Foundry.
           </p>
         </div>
-        <AddLanguageButton />
+        {/* <AddLanguageButton /> */}
       </div>
 
       <Suspense fallback={<Skeleton className="h-40" />}>
