@@ -418,3 +418,148 @@ def test_grouped_split_keeps_normalized_inputs_together(
     )
     assert result.split.strategy == SplitStrategy.grouped_by_input
     assert result.split.total_records == 60
+
+
+def test_grouped_dataset_build_preserves_records_and_metadata(
+    tmp_path: Path,
+):
+    source = tmp_path / "tiv-integration.jsonl"
+    output = tmp_path / "tiv-integration-output"
+
+    records = [
+        {
+            "id": "tiv-001-a",
+            "input": "Good morning",
+            "target": "Tiv greeting A",
+        },
+        {
+            "id": "tiv-001-b",
+            "input": "  GOOD   MORNING  ",
+            "target": "Tiv greeting B",
+        },
+        {
+            "id": "tiv-002",
+            "input": "Thank you",
+            "target": "Tiv gratitude",
+        },
+        {
+            "id": "tiv-003",
+            "input": "How are you?",
+            "target": "Tiv question",
+        },
+        {
+            "id": "tiv-004-a",
+            "input": "Good night",
+            "target": "Tiv farewell A",
+        },
+        {
+            "id": "tiv-004-b",
+            "input": "good night",
+            "target": "Tiv farewell B",
+        },
+        {
+            "id": "tiv-005",
+            "input": "Welcome",
+            "target": "Tiv welcome",
+        },
+        {
+            "id": "tiv-006",
+            "input": "Please",
+            "target": "Tiv request",
+        },
+        {
+            "id": "tiv-007",
+            "input": "I am coming",
+            "target": "Tiv response",
+        },
+        {
+            "id": "tiv-008",
+            "input": "See you tomorrow",
+            "target": "Tiv farewell",
+        },
+    ]
+
+    write_jsonl(source, records)
+    original_source = source.read_text(encoding="utf-8")
+
+    result = DatasetBuilder(
+        dataset_id="tiv-integration-v1",
+        dataset_path=source,
+        language_code="tiv",
+        output_dir=output,
+        seed=42,
+        split_strategy=SplitStrategy.grouped_by_input,
+    ).build()
+
+    split_names = ("train", "validation", "test")
+    output_records = {}
+    input_partitions: dict[str, set[str]] = {}
+
+    for split_name in split_names:
+        split_path = output / f"{split_name}.jsonl"
+        split_records = read_jsonl(split_path)
+
+        for raw_record in split_records:
+            record = DatasetRecord.model_validate(raw_record)
+
+            assert record.language_code == "tiv"
+            assert record.id not in output_records
+
+            output_records[record.id] = record.model_dump()
+
+            normalized_input = " ".join(
+                record.input.casefold().split()
+            )
+            input_partitions.setdefault(
+                normalized_input, set()
+            ).add(split_name)
+
+    # Every input record must be preserved exactly once.
+    expected_by_id = {
+        record["id"]: {
+            "id": record["id"],
+            "input": record["input"].strip(),
+            "target": record["target"].strip(),
+            "language_code": "tiv",
+        }
+        for record in records
+    }
+    assert output_records == expected_by_id
+
+    # Normalized variants of the same input cannot cross splits.
+    assert all(
+        len(partitions) == 1
+        for partitions in input_partitions.values()
+    )
+
+    # The build must produce valid and consistent split metadata.
+    metadata = json.loads(
+        (output / "split_metadata.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert metadata["dataset_id"] == "tiv-integration-v1"
+    assert metadata["strategy"] == "grouped_by_input"
+    assert metadata["seed"] == 42
+    assert metadata["total_records"] == len(records)
+
+    for split_name in split_names:
+        assert metadata[f"{split_name}_records"] == len(
+            read_jsonl(output / f"{split_name}.jsonl")
+        )
+
+    assert (
+        metadata["train_records"]
+        + metadata["validation_records"]
+        + metadata["test_records"]
+        == metadata["total_records"]
+    )
+
+    assert result.split.strategy == SplitStrategy.grouped_by_input
+    assert result.split.total_records == len(records)
+    assert result.excluded_records == 0
+    assert result.duplicate_records == 0
+
+    # Dataset preparation must not modify the original source.
+    assert source.read_text(encoding="utf-8") == original_source
