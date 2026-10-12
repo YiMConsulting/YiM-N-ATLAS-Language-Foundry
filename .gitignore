@@ -40,6 +40,8 @@ checkpoints/
 
 # Raw and bulky dataset files
 data/raw/*
+foundry/evaluations/*
+foundry/runs/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep

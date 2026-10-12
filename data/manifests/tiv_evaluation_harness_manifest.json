@@ -1,0 +1,60 @@
+{
+  "manifest_id": "tiv-evaluation-harness-v1",
+  "created_at_utc": "2026-10-12T12:00:00Z",
+  "evaluation_task": "English-to-Tiv Translation",
+  "base_model": {
+    "model_id": "NCAIR1/N-ATLaS",
+    "resolved_commit_sha": "e294476928aca9030e924ca27bb8e085e8581273",
+    "quantization": "8-bit (BitsAndBytesConfig load_in_8bit=True)"
+  },
+  "adapter": {
+    "run_id": "tiv-lora-smoke-v1",
+    "artifact_path": "foundry/runs/tiv-lora-smoke-v1/best_adapter",
+    "peft_type": "LORA",
+    "target_modules": ["v_proj", "q_proj"],
+    "r": 16,
+    "lora_alpha": 32,
+    "training_optimizer_steps": 4,
+    "status": "smoke_test_only"
+  },
+  "prompt_specification": {
+    "template_version": "v1-explicit-instruction",
+    "template": "Translate the following English text into Tiv:\n{text}",
+    "reference_excluded": true,
+    "identical_across_models": true
+  },
+  "dataset_and_split": {
+    "dataset_id": "tiv-mt560-v1",
+    "split_id": "tiv-mt560-v1-split-42",
+    "split_name": "validation",
+    "sample_size": 10,
+    "sampling_seed": 42,
+    "sample_record_ids": [
+      "mt560-140929",
+      "mt560-128743",
+      "mt560-007170",
+      "mt560-169980",
+      "mt560-054026",
+      "mt560-035711",
+      "mt560-132091",
+      "mt560-141699",
+      "mt560-179614",
+      "mt560-138662"
+    ]
+  },
+  "generation_parameters": {
+    "max_new_tokens": 128,
+    "do_sample": false,
+    "temperature": null,
+    "top_p": null,
+    "decoding": "greedy"
+  },
+  "evaluation_classification": {
+    "type": "diagnostic_smoke_test",
+    "benchmark_status": "unconverged_adapter_smoke_test",
+    "execution_deferred": true,
+    "deferral_reason": "Local GPU runtime unavailable and submission time constraints. Corrected harness validated via deterministic tests and notebook specification; live GPU re-evaluation deferred to post-submission GPU batch run.",
+    "quality_conclusion_supported": false,
+    "production_registry_eligible": false
+  }
+}
