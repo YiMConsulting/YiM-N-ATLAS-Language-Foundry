@@ -1024,3 +1024,5 @@ Implemented `EvaluationPromptBuilder` in `foundry/evaluation/harness.py`:
 - **Honesty & Anti-Fabrication Boundary:** No synthetic generation outputs or simulated BLEU improvements were fabricated to replace the deferred GPU execution.
 - **Sanitized Run Manifest:** Created `data/manifests/tiv_evaluation_harness_manifest.json` recording model ID, resolved revision, adapter reference, generation parameters (greedy, max_new_tokens=128), and sample record IDs.
 - **Registry Policy:** Excluded from the production experiment registry (`api/main.py: EXPERIMENTS`).
+
+## Version 1.0 --- threshold
