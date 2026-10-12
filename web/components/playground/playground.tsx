@@ -238,8 +238,8 @@ export function Playground() {
 
         {currentExperiment && !isExperimentReady ? (
           <div className="mt-4 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
-            Note: Experiment &ldquo;{currentExperiment.id}&rdquo; is currently in{" "}
-            <strong>{currentExperiment.status}</strong> status. Live adapter inference
+            Note: Experiment &ldquo;{currentExperiment.id || "unspecified"}&rdquo; is currently in{" "}
+            <strong className="capitalize">{currentExperiment.status || "pending"}</strong> status. Live adapter inference
             requires completed checkpoint artifacts.
           </div>
         ) : null}
