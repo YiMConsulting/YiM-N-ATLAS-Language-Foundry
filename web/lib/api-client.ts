@@ -126,6 +126,26 @@ export type ExperimentDto = {
   updated_at: string | null;
 };
 
+export type LossPoint = {
+  step: number;
+  loss: number;
+};
+
+export type ResultMetric = {
+  label: string;
+  base: string;
+  adapted: string;
+  delta: number;
+  displayChange: string;
+};
+
+export type ResultExample = {
+  prompt: string;
+  reference: string;
+  base_output: string;
+  adapted_output: string;
+};
+
 export type PlaygroundRequest = {
   prompt: string;
   language_code?: string;
@@ -188,6 +208,13 @@ export const foundryApi = {
   async getSplit(splitId: string) {
     const response = await apiClient.get<DatasetSplitDto>(
       `/splits/${encodeURIComponent(splitId)}`,
+    );
+    return response.data;
+  },
+
+  async getDatasetReviewEvidence(datasetId: string) {
+    const response = await apiClient.get<DatasetReviewEvidenceDto>(
+      `/datasets/${encodeURIComponent(datasetId)}/review-evidence`,
     );
     return response.data;
   },
@@ -342,4 +369,39 @@ export type HumanReviewSummaryDto = {
   needs_correction_count: number;
   pass_rate: number;
   status: string;
+};
+
+export type MetricScoreSummaryDto = {
+  metric_name: string;
+  scale: string;
+  description: string;
+  mean_score: number | null;
+  pass_count: number | null;
+  total_count: number;
+  score_distribution: Record<string, number>;
+};
+
+export type ReviewerScopeSummaryDto = {
+  assigned_reviewers: string[];
+  completed_reviewers: string[];
+  pending_reviewers: string[];
+};
+
+export type DatasetReviewEvidenceDto = {
+  dataset_id: string;
+  language_code: string;
+  review_type: string;
+  artifact_name: string;
+  sheet_name: string;
+  status: string;
+  total_sampled_records: number;
+  reviewed_records: number;
+  pending_records: number;
+  coverage_ratio: number;
+  sources_breakdown: Record<string, number>;
+  reviewer_scope: ReviewerScopeSummaryDto;
+  metrics: Record<string, MetricScoreSummaryDto>;
+  qualitative_findings: string[];
+  qualification: string;
+  evaluated_at: string;
 };

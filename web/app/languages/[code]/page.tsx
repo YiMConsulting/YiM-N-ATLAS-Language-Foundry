@@ -1,25 +1,14 @@
 import axios from "axios";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { isNotFound } from "@/lib/api/errors";
 import { StatusBadge } from "@/components/languages/status-badge";
 import { foundryApi, type LanguageDto } from "@/lib/api-client";
 
 type LanguagePageProps = {
   params: Promise<{ code: string }>;
 };
-
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  const weekday = date.toLocaleDateString("en-GB", { weekday: "short" });
-  const day = date.getDate();
-  const month = date.toLocaleDateString("en-GB", { month: "short" });
-  const year = date.getFullYear();
-  return `${weekday} ${day} ${month}, ${year}`;
-}
 
 export async function generateMetadata({
   params,
@@ -88,7 +77,6 @@ export default async function LanguageDetailPage({
       </div>
 
       <dl className="overflow-hidden rounded-lg border border-border bg-surface">
-        <RecordRow label="ID" value={language.id} />
         <RecordRow label="Name" value={language.name} />
         <RecordRow label="Language code" value={language.code} />
         <RecordRow

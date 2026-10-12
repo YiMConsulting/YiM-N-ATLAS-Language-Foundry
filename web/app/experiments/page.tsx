@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { ExperimentsList } from "@/components/experiments/experiments-list";
 import { foundryApi, type ExperimentDto } from "@/lib/api-client";
 
@@ -42,14 +41,4 @@ export default async function ExperimentsPage() {
       )}
     </div>
   );
-}
-
-async function ExperimentsSection() {
-  const { items } = await getExperiments();
-
-  if (items.length === 0) {
-    return <p className="text-sm text-muted">No experiments recorded yet.</p>;
-  }
-
-  return <ExperimentsList experiments={items} />;
 }

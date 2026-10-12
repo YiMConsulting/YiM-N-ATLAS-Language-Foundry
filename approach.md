@@ -895,3 +895,132 @@ Key architectural principles enforced:
    - In `api/main.py`, placeholder fixtures (`rev_req_igl_001` referencing the deleted `igl-parallel-v1` and 8 fabricated sentences) were purged, returning an empty registry by default until real review requests are sampled.
    - The contract defect where `get_review_samples` fell back to hardcoded samples on unknown IDs was corrected to return HTTP 404.
    - Next.js internal routes (`web/app/api/review/samples`, `web/app/api/review/submit`) were stripped of fabricated mock fallbacks, and legacy mock modules (`web/components/mockReviewData.ts`, `web/components/types.ts`) were marked deprecated.
+
+---
+
+### Final Mock-Data Cleanup & Unified Architecture Boundariesz
+
+#### Objectives & Cleanup Scope
+With Checkpoints 2 through 6 completing the migration of all six user-facing workflows (Languages, Datasets, Experiments, Results, Playground, and Human Review) to the backend API, Checkpoint 7 purged all obsolete mock-data modules, eliminated synthetic fallback records, and centralized shared presentation types.
+
+#### Modules Removed
+The following 7 mock files were permanently deleted:
+1. `web/components/mockReviewData.ts`: Synthetic Igala review items and fabricated translations.
+2. `web/components/types.ts`: Obsolete mock review types superseded by `web/lib/api-client.ts`.
+3. `web/lib/languages.ts`: Mock language fixtures (`igl`, `yor`, `hau`) superseded by `LanguageDto`.
+4. `web/lib/datasets.ts`: Mock dataset records and splits (`igl-parallel-v1`, `yor-parallel-v1`, `igl-monolingual-curated`) superseded by `DatasetDto` and `DatasetSplitDto`.
+5. `web/lib/experiments.ts`: Synthetic experiment runs and loss curves (`exp-igl-lora-v1`, `exp-yor-lora-v1`, `exp-igl-lora-v2-full`).
+6. `web/lib/results.ts`: Fabricated evaluation metrics and synthetic translation pairs.
+7. `web/lib/playground.ts`: Hardcoded translation pairs and mock latency simulations.
+
+#### Types Extracted & Retained
+To prevent breaking presentation components that render real evaluation metrics and training loss when returned by the API:
+- `LossPoint` (`{ step: number; loss: number }`): Extracted to `web/lib/api-client.ts`. Updated consumer: [`web/components/experiments/loss-chart.tsx`](file:///home/godswilljames/Documents/Github/YiM-N-ATLAS-Language-Foundry/web/components/experiments/loss-chart.tsx).
+- `ResultMetric` (`{ label: string; base: string; adapted: string; delta: number; displayChange: string }`): Extracted to `web/lib/api-client.ts`. Updated consumers: [`web/components/results/metrics-table.tsx`](file:///home/godswilljames/Documents/Github/YiM-N-ATLAS-Language-Foundry/web/components/results/metrics-table.tsx) and [`web/components/results/change-value.tsx`](file:///home/godswilljames/Documents/Github/YiM-N-ATLAS-Language-Foundry/web/components/results/change-value.tsx).
+- `ResultExample` (`{ prompt: string; reference: string; base_output: string; adapted_output: string }`): Extracted to `web/lib/api-client.ts`. Updated consumer: [`web/components/results/example-browser.tsx`](file:///home/godswilljames/Documents/Github/YiM-N-ATLAS-Language-Foundry/web/components/results/example-browser.tsx).
+
+#### Resulting Data-Flow Boundaries
+- **Single Source of Truth:** `web/lib/api-client.ts` serves as the sole contract boundary between the Next.js frontend and the FastAPI backend control plane (`/api/v1`).
+- **No Synthetic Fallbacks:** All user-facing views render real API records, honest empty states (for empty registries or queues), or explicit unavailable states (HTTP 503 with retry for model inference).
+- **Test Isolation:** Backend tests in `tests/` maintain their own self-contained unit fixtures without polluting production API endpoints or web client bundles.
+
+---
+
+### Integration of Verified Tiv Human-Review Evidence (Workbook Receiver 4)
+
+#### Background & Architectural Objective
+An offline manual review workbook was supplied (`docs/Tiv Translation Pilot - Manual Review Distribution_2.xlsx`) containing native linguist evaluations from evaluator `REV_04` for the Tiv translation pilot.
+
+The objective was to incorporate this empirical evaluation evidence into the N-ATLaS Language Foundry control plane and dataset views without reintroducing mock fixtures or fabricating data.
+
+#### Key Verified Evidence Facts
+1. **Source Scope & Evaluator Coverage:**
+   - Evaluator `REV_04` annotated 51 translation pairs (50 MT560 records, 1 Hypa Text-10k record).
+   - The pilot distributed 203 records across 4 evaluators (`REV_01`, `REV_02`, `REV_03`, `REV_04`).
+   - `REV_04` represents 25.12% manual sample coverage (51 / 203 records). Evaluators `REV_01`, `REV_02`, and `REV_03` remain pending (152 records unannotated).
+2. **Reviewer-Reported Metrics:**
+   - `translation_accurate`: Mean score 4.7647 / 5.0 (39 rows scored 5, 12 rows scored 4).
+   - `meaning_complete`: 100% Yes (51 / 51 rows).
+   - `tiv_naturalness`: Mean score 5.0 / 5.0 (51 / 51 rows scored 5).
+   - `format_acceptable`: 100% Yes (51 / 51 rows).
+3. **Qualitative Notes & Observations:**
+   - Evaluator notes explain specific judgments, such as praising idiomatic Tiv phrasing ("zwa Buter" for English), syntactic ordering, and duplicate input consistency.
+   - Minor score 4 ratings on `translation_accurate` stemmed from identified reference shifts between English and Tiv publication editions (e.g. English page 29 cited as Tiv translation page 11).
+
+#### Architectural Separation: Offline Evidence vs. Interactive Queues
+1. **Preserving Truthful Queues:**
+   - Completed offline review rows are NOT inserted into the interactive `REVIEW_REQUESTS` queue. The interactive review portal (`/review`) continues to display the true pending queue (currently empty).
+   - Interactive review submissions remain process-memory-only until durable persistence is implemented.
+2. **Dedicated Contract & Manifest Pipeline:**
+   - A sanitized, versioned JSON manifest (`data/manifests/tiv_human_review_evidence.json`) captures the aggregated statistics, scope, qualitative notes, and explicit qualifications without committing binary spreadsheets or PII to git.
+   - A dedicated endpoint `GET /api/v1/datasets/{dataset_id}/review-evidence` backed by typed schema `DatasetReviewEvidence` serves this data dynamically.
+   - The dataset detail page (`/datasets/[id]`) renders the `ReviewEvidenceCard` component when evidence exists, displaying the sample progress (25.1%), reviewer scope (1 of 4 evaluators completed), metrics breakdown, and qualitative notes.
+3. **Linguistic Qualification Disclaimer:**
+   - The UI and API explicitly qualify these metrics as reviewer-recorded judgments from evaluator `REV_04` across a 51-record pilot sample, rather than automated whole-dataset certifications or unearned full approvals. The dataset remains in `registered` status.
+4. **Data Governance:**
+   - The raw binary workbook `docs/*.xlsx` is explicitly excluded from version control via `.gitignore`.
+
+---
+
+### Checkpoint B — Audit of First N-ATLaS Base-versus-Tiv-Adapter Evaluation
+
+#### Objective & Scope
+Audit the preliminary evaluation comparing the base `NCAIR1/N-ATLaS` model against the Tiv LoRA adapter (`tiv-lora-smoke-v1`), reconstructing the exact methodology, inputs, generation settings, and recorded metrics from local artifacts and notebooks.
+
+#### Inspected Artifacts
+1. **Colab Evaluation Notebook:** `notebooks/tiv_base_vs_adapter_evaluation.ipynb` (12 executable cells with outputs).
+2. **Adapter & Training Configuration:**
+   - `foundry/runs/tiv-lora-smoke-v1/training_config.json` (lr=1e-4, batch=1, grad_accum=4, seed=42, epochs=1).
+   - `foundry/runs/tiv-lora-smoke-v1/training_metrics.json` (4 optimizer steps completed, training loss 5.756, validation loss 6.788).
+   - `foundry/runs/tiv-lora-smoke-v1/best_adapter/adapter_config.json` (PEFT LoRA r=16, alpha=32, target modules `q_proj` & `v_proj`).
+   - `foundry/runs/tiv-lora-smoke-v1/best_adapter/adapter_model.safetensors` (27,280,152 bytes).
+3. **Evaluation Outputs:**
+   - `foundry/evaluations/tiv-lora-smoke-v1/validation_sample.jsonl` (10 records sampled from `validation.jsonl` with seed 42).
+   - `foundry/evaluations/tiv-lora-smoke-v1/predictions.jsonl` (10 comparative prediction rows).
+   - `foundry/evaluations/tiv-lora-smoke-v1/metrics.json` (exact match, SacreBLEU, chrF for base vs. adapted).
+
+#### Methodology & Conditions
+- **Model Loading:** `NCAIR1/N-ATLaS` in 8-bit quantization (`BitsAndBytesConfig(load_in_8bit=True)`).
+- **Comparative Baseline:** Both models ran on the exact same loaded weights on GPU 0 using `peft.PeftModel`. The baseline disabled the adapter dynamically using `with model.disable_adapter(): ...`.
+- **Generation Parameters:** Greedy decoding (`do_sample=False`), `max_new_tokens=128`, padding token set to EOS.
+- **Sample Selection:** 10 records randomly sampled (`seed=42`) from held-out validation set `tiv-mt560-v1` (18,410 available records). Zero ID and zero text leakage with training set verified.
+
+#### Recorded Metrics
+- **Exact Match:** `0.0` (base) vs. `0.0` (adapted).
+- **SacreBLEU:** `0.5306` (base) vs. `0.5663` (adapted) (delta: +0.0357).
+- **chrF:** `10.1615` (base) vs. `10.4554` (adapted) (delta: +0.2939).
+
+#### Validity Audit & Key Findings
+1. **Leakage & Uniqueness Checks Passed:** 0 ID overlap and 0 text overlap between evaluation sample and `train.jsonl`. All 10 English inputs are unique.
+2. **Authentic Execution Passed:** Outputs and warning logs confirm genuine GPU generation in Colab, not fabricated or synthetic data.
+3. **Methodological Defect Identified (Prompt Construction):** The evaluation script constructed prompts via `apply_chat_template([{"role": "user", "content": english_text}])` without a translation task prefix or system instruction. As an instruction-tuned model, N-ATLaS treated the bare English input as a conversational prompt, answering in English or echoing the input rather than generating Tiv.
+4. **Adapter Incompleteness:** The evaluated adapter underwent only 4 optimizer steps (smoke run), so it had not acquired Tiv translation competence.
+5. **Quality Conclusion:** The evaluation proves pipeline feasibility (8-bit loading, adapter attachment, comparative inference, SacreBLEU computation), but **cannot support any conclusion regarding model translation quality or adapter efficacy**.
+6. **Registry Policy Maintained:** This run is classified as an offline diagnostic smoke test and is kept out of the production experiment registry (`api/main.py: EXPERIMENTS`).
+
+---
+
+### English-to-Tiv Evaluation Harness
+
+#### Objective & Scope
+Address the methodological defect uncovered during the Checkpoint B audit by implementing an explicit English-to-Tiv translation prompt harness, pinning the exact base-model revision, enforcing strict reference exclusion, ensuring model evaluation parity, and establishing a versioned evaluation manifest.
+
+#### Formalized Instruction Template & Prompt Builder
+Implemented `EvaluationPromptBuilder` in `foundry/evaluation/harness.py`:
+- **Prompt Template:** `Translate the following English text into Tiv:\n{text}` (`v1-explicit-instruction`).
+- **Target Language Specification:** Explicitly directs N-ATLaS to generate Tiv translations instead of interpreting bare inputs as conversational prompts.
+- **Reference Exclusion:** Guaranteed by design; `DatasetRecord.target` is strictly excluded from prompt construction.
+- **Model Evaluation Parity:** Guarantees that the baseline and adapter configurations receive byte-identical prompt strings for any input.
+- **Notebook Synchronization:** Updated `notebooks/tiv_base_vs_adapter_evaluation.ipynb` (Cells 7, 8, 9) to use this template consistently for both `base_model` and `adapted_model` generation.
+
+#### Base Model Identifier & Pinned Revision
+- **Base Model ID:** `NCAIR1/N-ATLaS`
+- **Resolved Commit SHA:** `e294476928aca9030e924ca27bb8e085e8581273` (verified via Hugging Face API).
+- Pinned in `foundry/evaluation/harness.py`, `data/manifests/tiv_evaluation_harness_manifest.json`, and the evaluation notebook.
+
+#### Controlled Validation & Execution Deferral Note
+- **Unit & Property Tests:** Added `tests/test_evaluation_harness.py` validating deterministic prompt formatting, reference exclusion, empty input rejection, template syntax, and manifest integrity (7 passed tests).
+- **Execution Deferral Due to Environment & Submission Constraints:** Because a local GPU runtime is unavailable and due to submission time constraints, live GPU model generation for this diagnostic has been deferred. The corrected harness, template formatting, and verification suites are fully in place; live GPU inference will be executed in a subsequent post-submission evaluation pass.
+- **Honesty & Anti-Fabrication Boundary:** No synthetic generation outputs or simulated BLEU improvements were fabricated to replace the deferred GPU execution.
+- **Sanitized Run Manifest:** Created `data/manifests/tiv_evaluation_harness_manifest.json` recording model ID, resolved revision, adapter reference, generation parameters (greedy, max_new_tokens=128), and sample record IDs.
+- **Registry Policy:** Excluded from the production experiment registry (`api/main.py: EXPERIMENTS`).

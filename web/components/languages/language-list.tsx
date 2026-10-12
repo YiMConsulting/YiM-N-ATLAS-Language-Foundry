@@ -21,7 +21,6 @@ export function LanguageList({ languages }: { languages: LanguageDto[] }) {
               <th className="px-4 py-3 font-medium">Language</th>
               <th className="px-4 py-3 font-medium">Description</th>
               <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Updated</th>
             </tr>
           </thead>
           <tbody>
@@ -46,9 +45,6 @@ export function LanguageList({ languages }: { languages: LanguageDto[] }) {
                 </td>
                 <td className="px-4 py-3">
                   <StatusBadge status={language.status} />
-                </td>
-                <td className="px-4 py-3 text-muted">
-                  {formatDate(language.updated_at)}
                 </td>
               </tr>
             ))}

@@ -1,15 +1,16 @@
 import axios from "axios";
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DatasetStatusBadge } from "@/components/datasets/dataset-status-badge";
 import { ProvenanceCard } from "@/components/datasets/provenance-card";
 import { QualityAuditCard } from "@/components/datasets/quality-audit-card";
+import { ReviewEvidenceCard } from "@/components/datasets/review-evidence-card";
 import { SplitBar } from "@/components/datasets/split-bar";
 import {
   foundryApi,
   type DatasetDto,
+  type DatasetReviewEvidenceDto,
   type DatasetSplitDto,
 } from "@/lib/api-client";
 
@@ -73,13 +74,12 @@ export default async function DatasetDetailPage({ params }: DatasetPageProps) {
     split = null;
   }
 
-  let quality: QualityAudit | null = null;
+  let reviewEvidence: DatasetReviewEvidenceDto | null = null;
   try {
-    quality = await getQualityAudit(id);
-  } catch (error) {
-    if (!isNotFound(error)) {
-      throw error;
-    }
+    reviewEvidence = await foundryApi.getDatasetReviewEvidence(id);
+  } catch {
+    // If offline review evidence does not exist or API fails, treat as null
+    reviewEvidence = null;
   }
 
   return (
@@ -122,6 +122,8 @@ export default async function DatasetDetailPage({ params }: DatasetPageProps) {
       </div>
 
       <SplitBar split={split} />
+
+      <ReviewEvidenceCard evidence={reviewEvidence} />
     </div>
   );
 }

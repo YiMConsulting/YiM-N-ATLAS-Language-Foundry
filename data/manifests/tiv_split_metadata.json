@@ -1,0 +1,14 @@
+{
+  "id": "tiv-mt560-v1-split-42",
+  "dataset_id": "tiv-mt560-v1",
+  "strategy": "grouped_by_input",
+  "seed": 42,
+  "train_ratio": 0.75,
+  "validation_ratio": 0.1,
+  "test_ratio": 0.15,
+  "total_records": 184099,
+  "train_records": 138074,
+  "validation_records": 18410,
+  "test_records": 27615,
+  "created_at": "2026-10-11T02:21:58.238666Z"
+}

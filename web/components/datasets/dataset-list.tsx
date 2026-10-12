@@ -11,7 +11,6 @@ export function DatasetList({ datasets }: { datasets: DatasetDto[] }) {
     );
   }
 
-function StatusPill({ status }: { status: DatasetStatus }) {
   return (
     <>
       {/* Table — desktop and tablet */}

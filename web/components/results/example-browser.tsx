@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ResultExample } from "@/lib/results";
+import type { ResultExample } from "@/lib/api-client";
 
 export function ExampleBrowser({ examples }: { examples: ResultExample[] }) {
   const [index, setIndex] = useState(0);

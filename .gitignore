@@ -40,9 +40,12 @@ checkpoints/
 
 # Raw and bulky dataset files
 data/raw/*
+foundry/evaluations/*
+foundry/runs/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+!data/processed/*/split_metadata.json
 outputs/examples/*
 !outputs/examples/.gitkeep
 outputs/metrics/*
@@ -79,3 +82,6 @@ logs/
 extracted_plan.txt
 parsed_plan.md
 parse_plan.py
+
+# Review Workbooks & Spreadsheets
+docs/*.xlsx

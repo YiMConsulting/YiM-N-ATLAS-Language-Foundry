@@ -10,7 +10,10 @@ node_modules
 
 data/raw/*
 data/processed/*
+!data/processed/*/split_metadata.json
 experiments/*
 outputs/*
+foundry/runs/*
+foundry/evaluations/*
 
 *.ipynb

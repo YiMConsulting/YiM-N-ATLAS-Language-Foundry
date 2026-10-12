@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { ResultsList } from "@/components/results/results-list";
 import { foundryApi, type ExperimentDto } from "@/lib/api-client";
 
@@ -42,14 +41,4 @@ export default async function ResultsPage() {
       )}
     </div>
   );
-}
-
-async function ResultsSection() {
-  const results = await getResults();
-
-  if (results.length === 0) {
-    return <p className="text-sm text-muted">No completed evaluations yet.</p>;
-  }
-
-  return <ResultsList experiments={results} />;
 }
