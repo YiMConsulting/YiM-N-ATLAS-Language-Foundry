@@ -1,0 +1,47 @@
+flowchart TD
+    subgraph DataIngestion ["1. Data Ingestion & Provenance"]
+        SRC["Raw Parallel Corpora<br/>(MT560, Hypa Candidate)"] --> AUD["Integrity & Format Audit<br/>(Schema, Encoding, Nulls)"]
+        AUD --> DEDUP["Deduplication Engine<br/>(14 Exact Duplicates Pruned)"]
+        DEDUP --> GRP["Grouped Input Partitioner<br/>(Seed: 42, 75/10/15)"]
+    end
+
+    subgraph DatasetSplits ["2. Deterministic Dataset Splits"]
+        GRP --> TRN["Train Set (138,074)"]
+        GRP --> VAL["Validation Set (18,410)"]
+        GRP --> TST["Test Set (27,615)"]
+        GRP --> SPLITMETA["Split Metadata Manifest<br/>(split_metadata.json)"]
+    end
+
+    subgraph QualityAndReview ["3. Human-in-the-Loop Quality Review"]
+        SPLITMETA --> SAMPLER["Review Sample Extractor<br/>(203 Distributed Pairs)"]
+        SAMPLER --> REV["Native Linguist Evaluation<br/>(REV_04 Annotated 51 Pairs)"]
+        REV --> REVMAN["Sanitized Evidence Manifest<br/>(tiv_human_review_evidence.json)"]
+    end
+
+    subgraph AdaptationPipeline ["4. Model Adaptation Pipeline"]
+        TRN --> PREPROC["Chat Template Preprocessor<br/>(Assistant Loss Masking: -100)"]
+        PREPROC --> COLL["Dynamic Batch Collator<br/>(Right-padding, eot_id)"]
+        COLL --> LORA["N-ATLaS LoRA Tuning<br/>(q_proj, v_proj, r=16, alpha=32)"]
+        BASE["Base Model: NCAIR1/N-ATLaS<br/>(SHA: e294476928ac)"] --> LORA
+        LORA --> ADAPTER["Saved PEFT Adapter<br/>(tiv-lora-smoke-v1)"]
+    end
+
+    subgraph EvaluationHarness ["5. Evaluation Harness"]
+        VAL --> EVALHARNESS["Prompt Formatter<br/>(Explicit English-to-Tiv Template)"]
+        ADAPTER --> COMP["Comparative Inference Engine<br/>(disable_adapter() Parity)"]
+        BASE --> COMP
+        EVALHARNESS --> COMP
+        COMP --> METRICS["SacreBLEU / chrF Scorer<br/>(Diagnostic Metrics)"]
+    end
+
+    subgraph ControlPlane ["6. FastAPI Control Plane & Web Interface"]
+        SPLITMETA --> API["FastAPI Backend (/api/v1)<br/>(Render Hosted Service)"]
+        REVMAN --> API
+        API --> WEB["Next.js Web Portal<br/>(Datasets, Review, Results)"]
+        API --> READONLY["Security Guard<br/>(Read-only Demo Mode)"]
+    end
+
+    style BASE fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    style ADAPTER fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style REVMAN fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style API fill:#ede7f6,stroke:#512da8,stroke-width:2px
