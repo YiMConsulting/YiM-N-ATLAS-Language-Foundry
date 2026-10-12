@@ -180,6 +180,7 @@ This central document introduces the project's vision and core engineering deliv
 | [**09-capabilities-and-limitations.md**](./09-capabilities-and-limitations.md) | Status & Boundaries | Component maturity matrix, operational boundaries, security & persistence limits |
 | [**10-roadmap-and-resource-requirements.md**](./10-roadmap-and-resource-requirements.md) | Roadmap & Compute Needs | Compute tiers (T4 to A100), multi-language scaling, dialect specialization roadmap |
 | [**11-hackathon-validation.md**](./11-hackathon-validation.md) | Hackathon Criteria Mapping | Problem Statement 1 mapping, submission checklist, external validation logs |
+| [**11-future-platform-vision-and-implementation-roadmap.md**](./11-future-platform-vision-and-implementation-roadmap.md) | Future Platform Blueprint | Target 12-step self-service vision, dialect adapter tree, compute orchestration, Phased Roadmap (A–D) |
 
 ---
 
