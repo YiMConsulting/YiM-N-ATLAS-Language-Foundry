@@ -895,3 +895,31 @@ Key architectural principles enforced:
    - In `api/main.py`, placeholder fixtures (`rev_req_igl_001` referencing the deleted `igl-parallel-v1` and 8 fabricated sentences) were purged, returning an empty registry by default until real review requests are sampled.
    - The contract defect where `get_review_samples` fell back to hardcoded samples on unknown IDs was corrected to return HTTP 404.
    - Next.js internal routes (`web/app/api/review/samples`, `web/app/api/review/submit`) were stripped of fabricated mock fallbacks, and legacy mock modules (`web/components/mockReviewData.ts`, `web/components/types.ts`) were marked deprecated.
+
+---
+
+### Final Mock-Data Cleanup & Unified Architecture Boundariesz
+
+#### Objectives & Cleanup Scope
+With Checkpoints 2 through 6 completing the migration of all six user-facing workflows (Languages, Datasets, Experiments, Results, Playground, and Human Review) to the backend API, Checkpoint 7 purged all obsolete mock-data modules, eliminated synthetic fallback records, and centralized shared presentation types.
+
+#### Modules Removed
+The following 7 mock files were permanently deleted:
+1. `web/components/mockReviewData.ts`: Synthetic Igala review items and fabricated translations.
+2. `web/components/types.ts`: Obsolete mock review types superseded by `web/lib/api-client.ts`.
+3. `web/lib/languages.ts`: Mock language fixtures (`igl`, `yor`, `hau`) superseded by `LanguageDto`.
+4. `web/lib/datasets.ts`: Mock dataset records and splits (`igl-parallel-v1`, `yor-parallel-v1`, `igl-monolingual-curated`) superseded by `DatasetDto` and `DatasetSplitDto`.
+5. `web/lib/experiments.ts`: Synthetic experiment runs and loss curves (`exp-igl-lora-v1`, `exp-yor-lora-v1`, `exp-igl-lora-v2-full`).
+6. `web/lib/results.ts`: Fabricated evaluation metrics and synthetic translation pairs.
+7. `web/lib/playground.ts`: Hardcoded translation pairs and mock latency simulations.
+
+#### Types Extracted & Retained
+To prevent breaking presentation components that render real evaluation metrics and training loss when returned by the API:
+- `LossPoint` (`{ step: number; loss: number }`): Extracted to `web/lib/api-client.ts`. Updated consumer: [`web/components/experiments/loss-chart.tsx`](file:///home/godswilljames/Documents/Github/YiM-N-ATLAS-Language-Foundry/web/components/experiments/loss-chart.tsx).
+- `ResultMetric` (`{ label: string; base: string; adapted: string; delta: number; displayChange: string }`): Extracted to `web/lib/api-client.ts`. Updated consumers: [`web/components/results/metrics-table.tsx`](file:///home/godswilljames/Documents/Github/YiM-N-ATLAS-Language-Foundry/web/components/results/metrics-table.tsx) and [`web/components/results/change-value.tsx`](file:///home/godswilljames/Documents/Github/YiM-N-ATLAS-Language-Foundry/web/components/results/change-value.tsx).
+- `ResultExample` (`{ prompt: string; reference: string; base_output: string; adapted_output: string }`): Extracted to `web/lib/api-client.ts`. Updated consumer: [`web/components/results/example-browser.tsx`](file:///home/godswilljames/Documents/Github/YiM-N-ATLAS-Language-Foundry/web/components/results/example-browser.tsx).
+
+#### Resulting Data-Flow Boundaries
+- **Single Source of Truth:** `web/lib/api-client.ts` serves as the sole contract boundary between the Next.js frontend and the FastAPI backend control plane (`/api/v1`).
+- **No Synthetic Fallbacks:** All user-facing views render real API records, honest empty states (for empty registries or queues), or explicit unavailable states (HTTP 503 with retry for model inference).
+- **Test Isolation:** Backend tests in `tests/` maintain their own self-contained unit fixtures without polluting production API endpoints or web client bundles.

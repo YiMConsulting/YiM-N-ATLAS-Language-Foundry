@@ -3,7 +3,7 @@
 > **A Practical Infrastructure Pipeline for Extending N-ATLAS to Underserved Nigerian Languages**  
 > *Submitted to the National AI Innovation Challenge (NAIC 2026)*  
 > **Problem Statement 1:** Developer Infrastructure (Fine-tuning starter kits, adaptation tooling & evaluation playgrounds)  
-> **Initial Laboratory Language:** **Igala** (`igl`)
+> **Initial Laboratory Language:** **Tiv** (`tiv`) *(Transitioned from initial scoping language **Igala** `igl`)*
 
 ---
 
@@ -13,20 +13,20 @@
 
 The Foundry is **not** another foundation model. Instead, it provides a disciplined, repeatable, and verifiable workflow for developers and researchers to systematically adapt N-ATLAS to underrepresented Nigerian languages without prompt-engineering guesswork or unmonitored scripts.
 
-For this MVP, the Foundry proves one complete, end-to-end language expansion journey using **Igala** (`igl`) as the primary laboratory language:
+For this MVP, the Foundry proves one complete, end-to-end language expansion journey using **Tiv** (`tiv`) as the active laboratory language with a verified parallel corpus (`tiv-mt560-v1`), while honoring and preserving the project's foundational journey with **Igala** (`igl`):
 
 ```
-[ RAW CORPUS / INGESTION ]
+[ RAW CORPUS / INGESTION ] (MT560 English-Tiv / Community Sources)
           ↓
-[ PROVENANCE & LICENSE AUDIT ] (CC-BY-4.0 / Open Data Manifests)
+[ PROVENANCE & LICENSE AUDIT ] (Open Research Manifests & Checksums)
           ↓
 [ CANONICAL DATASET RECORDS ] (id, input, target, language_code)
           ↓
 [ AUTOMATED QUALITY AUDIT ] (empty, malformed, duplicate, language mismatch)
           ↓
-[ HUMAN REVIEW PROTOCOL ] (native speaker sample audits & corrections)
+[ HUMAN REVIEW PROTOCOL ] (native speaker sample audits & diacritic corrections)
           ↓
-[ DETERMINISTIC DATASET SPLITS ] (Train 80% / Val 10% / Held-out Test 10%)
+[ DETERMINISTIC DATASET SPLITS ] (Train 75% / Val 10% / Held-out Test 15% with Grouped Splitting)
           ↓
 [ N-ATLAS CHAT FORMATTER & TOKENIZER BOUNDARY ] (<|eot_id|> validation)
           ↓
@@ -40,6 +40,19 @@ For this MVP, the Foundry proves one complete, end-to-end language expansion jou
           ↓
 [ IMMUTABLE REPRODUCIBILITY MANIFESTS + FASTAPI + PLAYGROUND ]
 ```
+
+### 1.1 Laboratory Language Evolution: From Igala to Tiv
+
+A foundational pillar of the N-ATLaS Language Foundry is **strict data truthfulness and verifiable provenance**: we never invent synthetic benchmarks, fabricate readiness, or bypass quality gates.
+
+* **The Initial Choice of Igala (`igl`):**
+  During initial project scoping and planning, **Igala** was formally selected as the Foundry's primary laboratory language. The project team invested initial research into Igala orthography, tone markers, and domain requirements. However, during the provenance and data-readiness audit phase, accessible and legally verifiable parallel training corpora for Igala could not be secured in sufficient volume without compromising provenance integrity.
+* **The Principled Transition to Tiv (`tiv`):**
+  Rather than fabricating synthetic Igala records or proceeding with unverified data, the team made an intentional engineering decision to transition the active adaptation pipeline to **Tiv (`tiv`)**. Tiv offered accessible, open research parallel data through the MT560 corpus (184,099 sentence pairs) and an explicit candidate instruction set (Hypa Text-10k). This provided the rigorous, real-world data foundation needed to validate our dataset builder, deterministic grouped splitting, and training collator.
+* **Preserving Igala in the Foundry:**
+  Igala is **not discarded**. It remains an active, registered language in the Foundry control plane (`lang-igl-002`, status: `discovered`) with full support in the human-review orthography toolbars. As community datasets and native-speaker corpora become verified, Igala will move seamlessly through the same audited adaptation pipeline.
+* **Language-Agnostic Architecture:**
+  This transition directly demonstrates the Foundry’s greatest strength: the control plane, quality filters, human review tools, split algorithms, and LoRA adaptation pipelines are completely **language-agnostic** and built to expand across Nigeria's 500+ indigenous languages.
 
 ---
 
@@ -156,15 +169,15 @@ Open `http://localhost:3000` to interact with the Foundry Dashboard and Model Pl
 
 ## 📊 5. Experiment Storage Contract
 
-Every adaptation run produces an immutable `Experiment` record adhering strictly to `api/schemas/experiment.py`:
+Every adaptation run produces an immutable `Experiment` record adhering strictly to `api/schemas/experiment.py` (illustrated below for an adaptation run on the verified Tiv corpus):
 
 ```json
 {
-  "id": "exp-igl-lora-v1",
-  "language_code": "igl",
+  "id": "exp-tiv-lora-v1",
+  "language_code": "tiv",
   "base_model": "NCAIR1/N-ATLaS",
-  "dataset_ids": ["ds-voiceafrica-igl-v1"],
-  "split_id": "split-igl-80-10-10",
+  "dataset_ids": ["tiv-mt560-v1"],
+  "split_id": "tiv-mt560-v1-split-42",
   "adaptation": {
     "method": "lora",
     "rank": 16,
@@ -206,10 +219,10 @@ Every adaptation run produces an immutable `Experiment` record adhering strictly
     "sample_outputs": []
   },
   "artifacts": {
-    "adapter_path": "experiments/exp-igl-lora-v1/adapter",
-    "config_path": "experiments/exp-igl-lora-v1/config.json",
-    "metrics_path": "experiments/exp-igl-lora-v1/metrics.json",
-    "logs_path": "experiments/exp-igl-lora-v1/training.log"
+    "adapter_path": "experiments/exp-tiv-lora-v1/adapter",
+    "config_path": "experiments/exp-tiv-lora-v1/config.json",
+    "metrics_path": "experiments/exp-tiv-lora-v1/metrics.json",
+    "logs_path": "experiments/exp-tiv-lora-v1/training.log"
   },
   "git_commit": "e4f8b91a",
   "created_at": "2026-10-09T18:00:00Z",

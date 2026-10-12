@@ -1,5 +1,5 @@
 import { ChangeValue } from "@/components/results/change-value";
-import type { ResultMetric } from "@/lib/results";
+import type { ResultMetric } from "@/lib/api-client";
 
 export function MetricsTable({ metrics }: { metrics: ResultMetric[] }) {
   return (

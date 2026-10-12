@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { LossPoint } from "@/lib/experiments";
+import type { LossPoint } from "@/lib/api-client";
 
 export function LossChart({ data }: { data: LossPoint[] }) {
   return (

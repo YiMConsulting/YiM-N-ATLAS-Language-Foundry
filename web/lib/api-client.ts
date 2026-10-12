@@ -126,6 +126,26 @@ export type ExperimentDto = {
   updated_at: string | null;
 };
 
+export type LossPoint = {
+  step: number;
+  loss: number;
+};
+
+export type ResultMetric = {
+  label: string;
+  base: string;
+  adapted: string;
+  delta: number;
+  displayChange: string;
+};
+
+export type ResultExample = {
+  prompt: string;
+  reference: string;
+  base_output: string;
+  adapted_output: string;
+};
+
 export type PlaygroundRequest = {
   prompt: string;
   language_code?: string;

@@ -1,4 +1,4 @@
-import type { ResultMetric } from "@/lib/results";
+import type { ResultMetric } from "@/lib/api-client";
 
 export function ChangeValue({ metric }: { metric: ResultMetric }) {
   const tone =
