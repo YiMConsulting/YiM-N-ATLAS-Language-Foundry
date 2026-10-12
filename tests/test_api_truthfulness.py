@@ -1,5 +1,8 @@
+import json
+from pathlib import Path
 from fastapi.testclient import TestClient
 import pytest
+
 
 from api.main import app
 from api.schemas.language import Language, LanguageStatus
@@ -108,4 +111,55 @@ def test_list_unknown_dataset_splits_returns_404(client):
     response = client.get("/api/v1/datasets/nonexistent-dataset/splits")
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
+
+
+def test_load_processed_splits_handles_malformed_and_duplicates(tmp_path: Path):
+    from api.main import load_processed_splits
+
+    # Directory with valid split
+    d1 = tmp_path / "valid_dir"
+    d1.mkdir()
+    valid_meta = {
+        "id": "split-001",
+        "dataset_id": "ds-001",
+        "strategy": "grouped_by_input",
+        "seed": 42,
+        "train_ratio": 0.8,
+        "validation_ratio": 0.1,
+        "test_ratio": 0.1,
+        "total_records": 100,
+        "train_records": 80,
+        "validation_records": 10,
+        "test_records": 10,
+        "created_at": "2026-10-12T00:00:00Z",
+    }
+    (d1 / "split_metadata.json").write_text(json.dumps(valid_meta), encoding="utf-8")
+
+    # Directory with duplicate split ID
+    d2 = tmp_path / "dup_dir"
+    d2.mkdir()
+    dup_meta = dict(valid_meta)
+    dup_meta["total_records"] = 999
+    (d2 / "split_metadata.json").write_text(json.dumps(dup_meta), encoding="utf-8")
+
+    # Directory with malformed JSON
+    d3 = tmp_path / "malformed_dir"
+    d3.mkdir()
+    (d3 / "split_metadata.json").write_text("{invalid json", encoding="utf-8")
+
+    # Directory with schema-invalid metadata (ratios don't sum to 1.0)
+    d4 = tmp_path / "schema_invalid_dir"
+    d4.mkdir()
+    invalid_schema = dict(valid_meta)
+    invalid_schema["id"] = "split-invalid"
+    invalid_schema["train_ratio"] = 0.5
+    (d4 / "split_metadata.json").write_text(json.dumps(invalid_schema), encoding="utf-8")
+
+    loaded = load_processed_splits(tmp_path)
+
+    # Valid split should be loaded, malformed skipped, and duplicate not overwritten
+    assert "split-001" in loaded
+    assert loaded["split-001"]["total_records"] == 100
+    assert "split-invalid" not in loaded
+    assert len(loaded) == 1
 

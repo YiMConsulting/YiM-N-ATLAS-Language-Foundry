@@ -791,6 +791,31 @@ Automated verification:
 - The repository's updated 8-bit setup has passed unit tests, but integration through that exact function with the real quantized model remains to be verified.
 - No optimizer update or complete real-data training run has been verified by this checkpoint.
 - The smoke-test loss is not evidence of improved Tiv translation quality.
-- Human linguistic review and source-license review remain outstanding for the exploratory Tiv dataset.
-
 **Next Checkpoint:** Validate the repository's model-setup function and existing training runner against the real 8-bit N-ATLaS model and prepared Tiv dataset. Begin with a controlled, small training run, verify optimizer updates, validation, and adapter checkpoint saving, and record the experiment configuration and artifacts.
+
+---
+
+### API-Backed Datasets UI Integration & Split Metadata Architecture
+
+#### Architectural Decision & Objectives
+In Checkpoint 3, the frontend dataset views (`web/app/datasets/page.tsx` and `web/app/datasets/[id]/page.tsx`) were migrated from hardcoded mock arrays to live, contract-backed backend endpoints via `foundryApi` in `web/lib/api-client.ts`.
+
+Key architectural principles enforced:
+1. **Contract-Backed API as Single Source of Truth:**
+   - The frontend never serves as the authority on dataset counts or partition statistics.
+   - All dataset metadata is fetched via `GET /api/v1/datasets` and `GET /api/v1/datasets/{dataset_id}` conforming strictly to `DatasetDto`.
+   - Nullable fields (e.g. `record_count: null`) are rendered truthfully as `"Unavailable"` rather than zero or inferred values.
+2. **Deterministic Split Metadata from Verified Processed Artifacts:**
+   - The verified Tiv dataset split (`tiv-mt560-v1-split-42`, `grouped_by_input`, seed `42`) was previously built and sealed on disk (`data/processed/tiv-mt560-v1/split_metadata.json`).
+   - Rather than embedding Tiv-specific constants into frontend components or inferring partitions from `record_count`, the backend dynamically discovers verified split metadata on disk and exposes them via `GET /api/v1/splits/{split_id}` and `GET /api/v1/datasets/{dataset_id}/splits`.
+   - The UI displays split statistics (`138,074` train, `18,410` validation, `27,615` test) only when retrieved from this contract-backed source; otherwise, an explicit `"No verified split metadata available"` state is rendered.
+3. **Separation of Provenance, Licensing, and Quality Claims:**
+   - The core `Dataset` schema exposes `provenance_id`, which records an identifier but not verified legal attribution or linguistic approval.
+   - The frontend explicitly renders license and legal status as `"Pending verification"` and automated quality audit checks as pending, preventing unearned claims of dataset readiness or quality approval before audit endpoints are formalized.
+
+#### Split Metadata Loading Implementation & Limitations
+- **Discovery Mechanism:** `api/main.py` implements `load_processed_splits()`, which scans `data/processed/*/split_metadata.json`, validates each payload against the Pydantic `DatasetSplit` schema, and caches valid records in `SPLITS`.
+- **Fault Tolerance:** Malformed JSON files or schema mismatches are logged as observable warnings via `foundry.api` logger and safely skipped without crashing unrelated endpoints. Duplicate split IDs are detected and preserved without silent overwriting.
+- **Runtime Limitations:**
+  - **Startup Loading:** Split metadata is scanned and cached at FastAPI startup. If new splits are generated on disk by `DatasetBuilder`, an API container restart (`docker compose restart api`) is required for discovery.
+  - **Container Mount Dependency:** The backend relies on the Docker volume mount `./data:/app/data:z` to access processed artifacts. Environments without this mount will truthfully report 0 splits rather than fabricating data.

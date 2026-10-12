@@ -9,7 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 import json
+import logging
 from pathlib import Path
+
+logger = logging.getLogger("foundry.api")
+
 
 from foundry.review.human_review import (
     HumanReviewSummary,
@@ -110,18 +114,49 @@ DATASETS: dict[str, dict[str, Any]] = {
     },
 }
 
-SPLITS: dict[str, dict[str, Any]] = {}
+def load_processed_splits(
+    base_dir: Path = Path("data/processed"),
+) -> dict[str, dict[str, Any]]:
+    """Discovers and validates split metadata files from processed data directories.
 
-processed_dir = Path("data/processed")
-if processed_dir.is_dir():
-    for split_meta_path in processed_dir.glob("*/split_metadata.json"):
+    Notes:
+        - Loaded at application startup. If new splits are generated on disk,
+          an API server restart is required to discover them.
+        - Each split_metadata.json is validated against the DatasetSplit schema.
+        - Malformed or invalid split files are logged as warnings and skipped,
+          ensuring other endpoints and splits remain available.
+        - Duplicate split IDs are logged as warnings and the initial occurrence is preserved.
+    """
+    splits: dict[str, dict[str, Any]] = {}
+    if not base_dir.is_dir():
+        return splits
+
+    for split_meta_path in sorted(base_dir.glob("*/split_metadata.json")):
         try:
             with split_meta_path.open("r", encoding="utf-8") as f:
                 meta = json.load(f)
-                DatasetSplit.model_validate(meta)
-                SPLITS[meta["id"]] = meta
-        except Exception:
-            pass
+            DatasetSplit.model_validate(meta)
+            split_id = meta["id"]
+            if split_id in splits:
+                logger.warning(
+                    "Duplicate split ID '%s' found in %s; preserving existing entry.",
+                    split_id,
+                    split_meta_path,
+                )
+                continue
+            splits[split_id] = meta
+        except Exception as exc:
+            logger.warning(
+                "Failed to load or validate split metadata from %s: %s",
+                split_meta_path,
+                exc,
+            )
+
+    return splits
+
+
+SPLITS: dict[str, dict[str, Any]] = load_processed_splits()
+
 
 # Review Requests & Sample Items
 DEFAULT_REVIEW_REQUEST_ID = "rev_req_igl_001"
