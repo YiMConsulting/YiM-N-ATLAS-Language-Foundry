@@ -134,6 +134,13 @@ export type PlaygroundRequest = {
   do_sample?: boolean;
 };
 
+/**
+ * Expected schema for playground generation response.
+ * Note: The backend endpoint POST /api/v1/playground/generate currently returns HTTP 503
+ * unconditionally (inference workers are not yet deployed) and does not define an explicit
+ * Pydantic response model. The frontend strictly validates that generated_text is present
+ * and of string type before treating any response as successful.
+ */
 export type PlaygroundResponse = {
   prompt?: string;
   generated_text?: string;
@@ -207,4 +214,132 @@ export const foundryApi = {
     return response.data;
   },
 
+  async listReviewRequests() {
+    const response = await apiClient.get<ApiListResponse<ReviewRequestDto>>(
+      "/review/requests",
+    );
+    return response.data;
+  },
+
+  async getReviewRequest(requestId: string) {
+    const response = await apiClient.get<ReviewRequestDto>(
+      `/review/requests/${encodeURIComponent(requestId)}`,
+    );
+    return response.data;
+  },
+
+  async getReviewSamples(requestId: string) {
+    const response = await apiClient.get<
+      ApiListResponse<ReviewSampleItemDto> & { review_request_id: string }
+    >(`/review/requests/${encodeURIComponent(requestId)}/samples`);
+    return response.data;
+  },
+
+  async submitReviewDecision(payload: SubmitDecisionPayload) {
+    const response = await apiClient.post<ReviewDecisionRecordDto>(
+      "/review/decisions",
+      payload,
+    );
+    return response.data;
+  },
+
+  async submitReviewBatch(payload: BatchSubmitPayload) {
+    const response = await apiClient.post<BatchSubmitResponseDto>(
+      "/review/submit",
+      payload,
+    );
+    return response.data;
+  },
+
+  async getReviewSummary(requestId: string) {
+    const response = await apiClient.get<HumanReviewSummaryDto>(
+      `/review/requests/${encodeURIComponent(requestId)}/summary`,
+    );
+    return response.data;
+  },
+};
+
+export type ReviewRequestStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
+
+export type ReviewDecision = "correct" | "incorrect" | "needs_correction";
+
+export type ReviewRequestDto = {
+  id: string;
+  dataset_id: string;
+  reviewer_id: string | null;
+  sample_size: number;
+  status: ReviewRequestStatus;
+  created_at: string;
+  updated_at: string | null;
+};
+
+export type ReviewSampleItemDto = {
+  id: string;
+  review_request_id: string;
+  record_id: string;
+  input_text: string;
+  expected_text: string;
+  context?: string | null;
+  flagged_reason?: string | null;
+  sampled_at: string;
+};
+
+export type ReviewDecisionRecordDto = {
+  id: string;
+  review_request_id: string;
+  sample_item_id: string;
+  decision: ReviewDecision;
+  reviewer_id: string | null;
+  corrected_text: string | null;
+  notes: string | null;
+  reviewed_at: string;
+};
+
+export type SubmitDecisionPayload = {
+  review_request_id: string;
+  sample_item_id: string;
+  decision: ReviewDecision | "approved" | "rejected";
+  reviewer_id?: string;
+  corrected_text?: string;
+  notes?: string;
+};
+
+export type BatchSubmitDecisionItem = {
+  sample_id?: string;
+  sample_item_id?: string;
+  decision: ReviewDecision | "approved" | "rejected";
+  suggested_correction?: string;
+  corrected_text?: string;
+  comment?: string;
+  notes?: string;
+};
+
+export type BatchSubmitPayload = {
+  dataset_id: string;
+  reviewer_id: string;
+  decisions: BatchSubmitDecisionItem[];
+  submitted_at?: string;
+};
+
+export type BatchSubmitResponseDto = {
+  status: string;
+  dataset_id: string;
+  reviewer_id: string;
+  processed_decisions: number;
+  message: string;
+  timestamp: string;
+};
+
+export type HumanReviewSummaryDto = {
+  review_request_id: string;
+  total_reviewed: number;
+  correct_count: number;
+  incorrect_count: number;
+  needs_correction_count: number;
+  pass_rate: number;
+  status: string;
 };

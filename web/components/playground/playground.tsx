@@ -63,6 +63,10 @@ export function Playground() {
   }, []);
 
   const currentExperiment = experiments.find((exp) => exp.id === experimentId);
+  const hasExperiments = experiments.length > 0;
+  const isExperimentReady =
+    currentExperiment?.status === "completed" &&
+    Boolean(currentExperiment.artifacts?.adapter_path);
 
   const run = async () => {
     const trimmed = prompt.trim();
@@ -72,6 +76,11 @@ export function Playground() {
     }
 
     if (status === "loading") {
+      return;
+    }
+
+    if (!hasExperiments || !isExperimentReady) {
+      toast.warning("Inference requires an eligible, completed experiment.");
       return;
     }
 
@@ -88,14 +97,18 @@ export function Playground() {
         do_sample: false,
       });
 
-      if (res && typeof res.generated_text === "string") {
+      if (
+        res &&
+        typeof res.generated_text === "string" &&
+        res.generated_text.trim().length > 0
+      ) {
         setOutput(res);
         setStatus("done");
       } else {
         setStatus("error");
         setErrorInfo({
-          statusText: "Empty Response",
-          message: "API did not return generated text in the response body.",
+          statusText: "Invalid Response",
+          message: "API did not return valid generated text in the response body.",
         });
       }
     } catch (err: unknown) {
@@ -160,11 +173,6 @@ export function Playground() {
       }
     }
   };
-
-  const hasExperiments = experiments.length > 0;
-  const isExperimentReady =
-    currentExperiment?.status === "completed" &&
-    Boolean(currentExperiment.artifacts?.adapter_path);
 
   return (
     <div className="space-y-6">
@@ -260,13 +268,15 @@ export function Playground() {
           <button
             type="button"
             onClick={run}
-            disabled={status === "loading" || !hasExperiments}
+            disabled={status === "loading" || !hasExperiments || !isExperimentReady}
             className="inline-flex items-center justify-center rounded-md bg-accent px-5 py-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
             {status === "loading"
               ? "Running Inference…"
               : !hasExperiments
               ? "Inference Unavailable (No Experiments)"
+              : !isExperimentReady
+              ? "Inference Unavailable (Experiment Ineligible)"
               : "Generate"}
           </button>
         </div>
@@ -307,7 +317,8 @@ export function Playground() {
                 <button
                   type="button"
                   onClick={run}
-                  className="text-xs text-accent hover:underline"
+                  disabled={!hasExperiments || !isExperimentReady}
+                  className="text-xs text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
                 >
                   Retry request
                 </button>
@@ -316,7 +327,7 @@ export function Playground() {
                 {errorInfo.message}
               </p>
             </div>
-          ) : status === "done" && output ? (
+          ) : status === "done" && output && typeof output.generated_text === "string" ? (
             <div className="space-y-3">
               <p className="whitespace-pre-wrap font-medium text-foreground leading-relaxed">
                 {output.generated_text}

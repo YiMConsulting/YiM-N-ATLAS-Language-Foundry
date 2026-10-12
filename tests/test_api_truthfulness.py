@@ -163,3 +163,39 @@ def test_load_processed_splits_handles_malformed_and_duplicates(tmp_path: Path):
     assert "split-invalid" not in loaded
     assert len(loaded) == 1
 
+
+def test_review_requests_returns_empty_queue(client):
+    response = client.get("/api/v1/review/requests")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["items"] == []
+    assert data["total"] == 0
+
+
+def test_get_unknown_review_request_returns_404(client):
+    response = client.get("/api/v1/review/requests/nonexistent-request")
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
+
+
+def test_get_unknown_review_samples_returns_404(client):
+    response = client.get("/api/v1/review/requests/nonexistent-request/samples")
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
+
+
+def test_get_unknown_review_summary_returns_404(client):
+    response = client.get("/api/v1/review/requests/nonexistent-request/summary")
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
+
+
+def test_submit_review_batch_unknown_dataset_returns_404(client):
+    payload = {
+        "dataset_id": "nonexistent-dataset",
+        "reviewer_id": "reviewer-01",
+        "decisions": [],
+    }
+    response = client.post("/api/v1/review/submit", json=payload)
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()

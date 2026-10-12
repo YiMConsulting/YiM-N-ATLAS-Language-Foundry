@@ -1,3 +1,10 @@
+/**
+ * @deprecated Checkpoint 6 Migration Notice
+ * Mock review data has been removed from active human-review workflows.
+ * The ReviewPortal now consumes real backend review requests and sample items
+ * via `foundryApi.listReviewRequests()` and `foundryApi.getReviewSamples()` in `@/lib/api-client`.
+ * Retained solely for backwards reference.
+ */
 import { ReviewSample } from './types';
 
 export const MOCK_IGALA_SAMPLES: ReviewSample[] = [

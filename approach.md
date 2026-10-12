@@ -865,4 +865,33 @@ Key architectural principles enforced:
    - **Zero Fabrication:** An error response is never converted into a synthetic translation, and mock translations are never substituted.
 4. **Control Plane / ML Execution Separation:**
    - In accordance with the Foundry architecture, the FastAPI control plane remains strictly separated from GPU/ML execution. No dummy inference worker was introduced in this checkpoint.
-   - Legacy mock files (`web/lib/playground.ts`) are marked deprecated and retained only for backward reference where needed. Other components (such as `web/components/ReviewPortal.tsx`) continue using their existing mock modules pending their scheduled checkpoint migration.
+   - Legacy mock files (`web/lib/playground.ts`) are marked deprecated and retained only for backward reference where needed.
+
+---
+
+### API-Backed Human-Review Portal Migration & Audit Architecture
+
+#### Architectural Decision & Objectives
+In Checkpoint 6, the human review portal (`web/components/ReviewPortal.tsx` and `web/app/review/page.tsx`) was migrated from hardcoded mock datasets (`web/components/mockReviewData.ts`), simulated proxy routes (`web/app/api/review/`), and fabricated reviewer identities (`olusegun-linguist`) to the typed backend API via `foundryApi` in `web/lib/api-client.ts`.
+
+Key architectural principles enforced:
+1. **Contract-Backed Review Operations:**
+   - The shared client defines typed DTOs mirroring the Pydantic schemas in `foundry.review.human_review` and endpoints in `api/main.py`:
+     - `ReviewRequestDto`: `id`, `dataset_id`, `reviewer_id`, `sample_size`, `status`, `created_at`, `updated_at`.
+     - `ReviewSampleItemDto`: `id`, `review_request_id`, `record_id`, `input_text`, `expected_text`, `context`, `flagged_reason`, `sampled_at`.
+     - `ReviewDecisionRecordDto`: `id`, `review_request_id`, `sample_item_id`, `decision`, `reviewer_id`, `corrected_text`, `notes`, `reviewed_at`.
+     - `HumanReviewSummaryDto`: `review_request_id`, `total_reviewed`, `correct_count`, `incorrect_count`, `needs_correction_count`, `pass_rate`, `status`.
+   - The shared client exposes typed methods: `foundryApi.listReviewRequests()`, `foundryApi.getReviewRequest(id)`, `foundryApi.getReviewSamples(id)`, `foundryApi.submitReviewDecision(payload)`, `foundryApi.submitReviewBatch(payload)`, and `foundryApi.getReviewSummary(id)`.
+2. **Truthful Queue State & Backend Limitations:**
+   - **Empty Queue Representation:** When `foundryApi.listReviewRequests()` returns 0 requests, the portal renders an explicit empty state explaining that review requests are triggered by dataset sampling and quality audit triage.
+   - **Exposing Current Backend Limitations:** While the review schemas (`ReviewRequest`, `ReviewSampleItem`, `ReviewDecisionRecord`, `HumanReviewSummary`) are formally defined in the Foundry architecture, persistent control-plane database storage and automated dataset sampling pipelines are not yet deployed. The UI explicitly states this limitation rather than pretending an active sampling worker exists.
+   - **Dataset Status Integrity:** The Tiv pilot dataset (`tiv-mt560-v1`) remains in `registered` status until native speaker review sampling and provenance audits are recorded.
+3. **Data Integrity & Canonical Decisions:**
+   - The portal enforces canonical decision values: `correct`, `needs_correction`, `incorrect` (matching the `ReviewDecision` enum in `foundry/review/human_review.py`).
+   - For corrections, language-specific orthography toolbars support tone markings and diacritics for Tiv (`ô`, `û`, `gh`, `kp`, `mb`, `sh`, `ts`), Igala, Yoruba, Hausa, and Igbo.
+   - Reviewer identity is not hardcoded to a fabricated persona, but entered by the reviewer and validated.
+   - Batch submissions require active selections and a valid reviewer identity. In-flight requests are protected against duplicate submission. Success confirmations are displayed only upon receiving a genuine HTTP 201 Created response from the API.
+4. **Purging Fabricated Backend Fixtures & Legacy Deprecation:**
+   - In `api/main.py`, placeholder fixtures (`rev_req_igl_001` referencing the deleted `igl-parallel-v1` and 8 fabricated sentences) were purged, returning an empty registry by default until real review requests are sampled.
+   - The contract defect where `get_review_samples` fell back to hardcoded samples on unknown IDs was corrected to return HTTP 404.
+   - Next.js internal routes (`web/app/api/review/samples`, `web/app/api/review/submit`) were stripped of fabricated mock fallbacks, and legacy mock modules (`web/components/mockReviewData.ts`, `web/components/types.ts`) were marked deprecated.

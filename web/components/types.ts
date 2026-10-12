@@ -1,3 +1,8 @@
+/**
+ * @deprecated Checkpoint 6 Migration Notice
+ * Legacy mock types for the review prototype. Active components now use typed
+ * DTOs from `@/lib/api-client` (`ReviewRequestDto`, `ReviewSampleItemDto`, `ReviewDecisionRecordDto`).
+ */
 export type ReviewDecision = 'approved' | 'needs_correction' | 'rejected';
 
 export interface ReviewSample {
