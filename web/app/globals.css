@@ -3,39 +3,39 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #191f3d;
+  --background: #f8fafc;
+  --foreground: #0f172a;
   --surface: #ffffff;
-  --surface-muted: #f4f6fb;
-  --border: #e3e7f1;
-  --muted: #5b6386;
-  --primary: #191f3d;
+  --surface-muted: #f1f5f9;
+  --border: #e2e8f0;
+  --muted: #64748b;
+  --primary: #0f172a;
   --primary-foreground: #ffffff;
-  --accent: #2e5bff;
+  --accent: #2563eb;
   --accent-foreground: #ffffff;
-  --accent-hover: #2447cc;
-  --accent-soft: #eef2ff;
-  --sidebar: #f6f7fc;
-  --sidebar-foreground: #191f3d;
-  --sidebar-active: #e6eaff;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #eff6ff;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-active: #eff6ff;
 }
 
 [data-theme="dark"] {
-  --background: #12182e;
-  --foreground: #ffffff;
-  --surface: #1d2445;
-  --surface-muted: #232b52;
-  --border: #2f3761;
-  --muted: #b8bfe0;
-  --primary: #191f3d;
-  --primary-foreground: #ffffff;
-  --accent: #7c93ff;
-  --accent-foreground: #12182e;
-  --accent-hover: #9bb0ff;
-  --accent-soft: #242c55;
-  --sidebar: #191f3d;
-  --sidebar-foreground: #ffffff;
-  --sidebar-active: #242c55;
+  --background: #090d16;
+  --foreground: #f8fafc;
+  --surface: #0f1527;
+  --surface-muted: #171f38;
+  --border: #242f52;
+  --muted: #94a3b8;
+  --primary: #f8fafc;
+  --primary-foreground: #090d16;
+  --accent: #3b82f6;
+  --accent-foreground: #ffffff;
+  --accent-hover: #60a5fa;
+  --accent-soft: #1e294f;
+  --sidebar: #0c1122;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-active: #171f38;
 }
 
 @theme inline {
@@ -67,4 +67,39 @@ body {
     system-ui,
     -apple-system,
     sans-serif;
+  letter-spacing: -0.011em;
+}
+
+/* Tactile Card Transitions */
+.card-interactive {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-interactive:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .card-interactive:hover {
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.45);
+}
+
+/* Clean Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }

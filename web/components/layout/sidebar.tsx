@@ -12,7 +12,7 @@ function NavGroup({ items, pathname }: { items: NavItem[]; pathname: string }) {
       {items.map((item) => {
         const Icon = item.icon;
         const isActive =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
+          pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`));
 
         return (
           <li key={item.href}>
@@ -20,15 +20,18 @@ function NavGroup({ items, pathname }: { items: NavItem[]; pathname: string }) {
               href={item.href}
               aria-current={isActive ? "page" : undefined}
               className={[
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
                 "md:justify-center lg:justify-start",
                 isActive
-                  ? "bg-sidebar-active text-foreground"
-                  : "text-sidebar-foreground/80 hover:bg-surface-muted hover:text-foreground",
+                  ? "bg-accent/10 text-accent font-semibold shadow-xs"
+                  : "text-muted hover:bg-surface-muted hover:text-foreground",
               ].join(" ")}
             >
-              <Icon className="h-5 w-5 shrink-0" />
+              <Icon className={["h-4 w-4 shrink-0 transition-transform duration-150", isActive ? "text-accent scale-105" : "text-muted"].join(" ")} />
               <span className="md:hidden lg:block">{item.label}</span>
+              {isActive ? (
+                <span className="ml-auto hidden h-1.5 w-1.5 rounded-full bg-accent md:hidden lg:block" />
+              ) : null}
             </Link>
           </li>
         );
@@ -50,7 +53,7 @@ export function Sidebar({
     <>
       {mobileOpen ? (
         <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs md:hidden"
           onClick={onClose}
           aria-hidden="true"
         />
@@ -63,33 +66,62 @@ export function Sidebar({
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}
       >
-        <div className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-3 md:justify-center lg:justify-start lg:px-4">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
-            N
-          </span>
-          <span className="truncate text-sm font-semibold tracking-wide md:hidden lg:block">
-            N-ATLAS Foundry
-          </span>
+        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-border px-3 md:justify-center lg:justify-start lg:px-4">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 via-cyan-500 to-emerald-500 p-[1.5px] shadow-xs">
+            <div className="flex h-full w-full items-center justify-center rounded-[6px] bg-surface text-foreground">
+              <span className="bg-gradient-to-r from-blue-500 to-emerald-500 bg-clip-text text-transparent font-black text-sm">
+                N
+              </span>
+            </div>
+          </div>
+          <div className="min-w-0 md:hidden lg:block">
+            <span className="truncate text-sm font-bold tracking-tight text-foreground block">
+              N-ATLAS Foundry
+            </span>
+            <span className="text-[10px] text-muted tracking-wide uppercase font-semibold block">
+              Language Forge
+            </span>
+          </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close navigation"
-            className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-sidebar-foreground transition-colors hover:bg-surface-muted md:hidden"
+            className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-foreground md:hidden"
           >
             <XIcon className="h-5 w-5" />
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <NavGroup items={primaryNav} pathname={pathname} />
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+          <div>
+            <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-wider text-muted md:hidden lg:block">
+              Core Platform
+            </p>
+            <NavGroup items={primaryNav} pathname={pathname} />
+          </div>
 
-          <div className="my-4 h-px bg-border" />
-
-          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted md:hidden lg:block">
-            Review
-          </p>
-          <NavGroup items={reviewNav} pathname={pathname} />
+          <div>
+            <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-wider text-muted md:hidden lg:block">
+              Verification &amp; Quality
+            </p>
+            <NavGroup items={reviewNav} pathname={pathname} />
+          </div>
         </nav>
+
+        {/* Sidebar Footer Indicator */}
+        <div className="p-3 border-t border-border md:hidden lg:block">
+          <div className="rounded-lg bg-surface-muted/60 p-3 border border-border/50 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-foreground">Active Pilot</span>
+              <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                Tiv (tiv)
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-muted truncate">
+              184k clean sentence pairs
+            </p>
+          </div>
+        </div>
       </aside>
     </>
   );
