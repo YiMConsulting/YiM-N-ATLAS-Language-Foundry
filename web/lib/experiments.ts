@@ -1,4 +1,14 @@
+/**
+ * MIGRATION NOTE (Checkpoint 4):
+ * The experiments list and detail UI have been migrated to the real Foundry API
+ * via `foundryApi.listExperiments()` and `foundryApi.getExperiment(id)` in `@/lib/api-client`.
+ *
+ * This mock file is retained temporarily for non-migrated consumers (such as Playground),
+ * and is scheduled for complete removal when the remaining workflows are migrated.
+ */
+
 export type ExperimentStatus = "queued" | "running" | "completed" | "failed";
+
 
 export type Hyperparameters = {
   adapter_method: string;

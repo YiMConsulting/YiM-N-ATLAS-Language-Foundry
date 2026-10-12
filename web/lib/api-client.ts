@@ -134,6 +134,16 @@ export type PlaygroundRequest = {
   do_sample?: boolean;
 };
 
+export type PlaygroundResponse = {
+  prompt?: string;
+  generated_text?: string;
+  language_code?: string;
+  model?: string;
+  experiment_id?: string | null;
+  latency_ms?: number;
+};
+
+
 export const foundryApi = {
   async listLanguages() {
     const response =
@@ -190,10 +200,11 @@ export const foundryApi = {
   },
 
   async generate(request: PlaygroundRequest) {
-    const response = await apiClient.post(
+    const response = await apiClient.post<PlaygroundResponse>(
       "/playground/generate",
       request,
     );
     return response.data;
   },
+
 };

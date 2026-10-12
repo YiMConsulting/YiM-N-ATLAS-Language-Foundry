@@ -817,5 +817,52 @@ Key architectural principles enforced:
 - **Discovery Mechanism:** `api/main.py` implements `load_processed_splits()`, which scans `data/processed/*/split_metadata.json`, validates each payload against the Pydantic `DatasetSplit` schema, and caches valid records in `SPLITS`.
 - **Fault Tolerance:** Malformed JSON files or schema mismatches are logged as observable warnings via `foundry.api` logger and safely skipped without crashing unrelated endpoints. Duplicate split IDs are detected and preserved without silent overwriting.
 - **Runtime Limitations:**
-  - **Startup Loading:** Split metadata is scanned and cached at FastAPI startup. If new splits are generated on disk by `DatasetBuilder`, an API container restart (`docker compose restart api`) is required for discovery.
   - **Container Mount Dependency:** The backend relies on the Docker volume mount `./data:/app/data:z` to access processed artifacts. Environments without this mount will truthfully report 0 splits rather than fabricating data.
+
+---
+
+### API-Backed Experiments & Results UI Integration
+
+#### Architectural Decision & Objectives
+In Checkpoint 4, the experiments and results user interfaces (`/experiments`, `/experiments/[experiment_id]`, `/results`, `/results/[experiment_id]`) were migrated from hardcoded mock arrays (`web/lib/experiments.ts`, `web/lib/results.ts`) to the typed backend API client (`foundryApi.listExperiments()`, `foundryApi.getExperiment(id)`).
+
+Key architectural decisions enforced:
+1. **Truthful Experiment State Representation:**
+   - The experiments list page (`/experiments`) reflects the live state from `GET /api/v1/experiments`. When zero experiments are recorded in the backend store, the UI renders an explicit empty state explaining that no experiments have been recorded yet, avoiding fabricated experiment IDs, dates, and parameters.
+   - Experiment detail routes (`/experiments/[experiment_id]`) resolve dynamically via `foundryApi.getExperiment(id)`. Static route generation based on mock arrays (`generateStaticParams`) was removed to ensure newly registered or dynamically loaded experiments can resolve.
+   - Status code 404 from the backend renders the Next.js `notFound()` page, while network or server exceptions render a distinct error notification without mock data fallbacks.
+2. **Schema Fidelity & Status Preservation:**
+   - Supported statuses align strictly with the backend `ExperimentStatus` enum: `queued`, `running`, `evaluating`, `completed`, `failed`. The UI was updated to explicitly recognize and style `evaluating` without conflating it with other lifecycle phases.
+   - All rendered fields match the Pydantic schema: `id`, `language_code`, `base_model`, `dataset_ids`, `split_id`, `adaptation`, `training`, `runtime`, `status`, `artifacts`, `git_commit`, `created_at`, `updated_at`.
+   - Nullable fields (e.g. ungenerated artifact paths, optional git commit hashes) render as `"Unavailable"` rather than fabricated defaults.
+3. **Elimination of Fabricated Metrics & Results:**
+   - Synthetic evaluation metrics (such as fake +35.8% exact-match improvements, fabricated BLEU/chrF gains, synthetic loss point histories, and synthetic translations) have been removed from user-facing workflows.
+   - Training loss curves are rendered only when real step-by-step metrics are present in the experiment record; otherwise, the UI truthfully states that loss history is unavailable.
+   - The results list (`/results`) and detail (`/results/[experiment_id]`) pages now read genuine evaluation results from `ExperimentDto.base_results` and `ExperimentDto.adapted_results`. If an experiment has not reached `completed` status or does not contain recorded metrics, an honest pending state is displayed.
+4. **Diagnostic Smoke-Test Separation:**
+   - The preliminary Colab N-ATLaS 8-bit smoke test proved gradient computation on a diagnostic batch, but was not a full dataset adaptation run and established no translation evaluation. In accordance with project policy, it is kept separate and not injected as a completed experiment in the API.
+
+---
+
+### API-Backed Playground Integration & Inference Limitations
+
+#### Architectural Decision & Objectives
+In Checkpoint 5, the playground user interface (`web/components/playground/playground.tsx` and `web/app/playground/page.tsx`) was migrated from hardcoded mock datasets, simulated `setTimeout` delays, and fabricated translations (`web/lib/playground.ts`) to the backend API via `foundryApi.listExperiments()` and `foundryApi.generate()` in `web/lib/api-client.ts`.
+
+Key architectural principles enforced:
+1. **Dynamic Experiment Discovery & Readiness Verification:**
+   - The playground experiment selector dynamically queries `GET /api/v1/experiments` on mount.
+   - When the experiment registry is empty, the playground renders an explicit empty state (`"No experiments available in the registry. Model generation requires an active, trained experiment."`) and disables the generation interface.
+   - The UI avoids inventing default experiment IDs, base models, or synthetic language capabilities.
+2. **Strict Backend Contract Integration:**
+   - Generation requests are dispatched to `POST /api/v1/playground/generate` conforming strictly to `PlaygroundRequest` (`prompt`, `language_code`, `experiment_id`, `max_new_tokens`, `do_sample`).
+   - The shared client typed response `PlaygroundResponse` mirrors the API contract (`prompt`, `generated_text`, `language_code`, `model`, `experiment_id`, `latency_ms`).
+   - Request payloads validate inputs (prompt length, token bounds), prevent concurrent submissions during inflight requests, and safely handle component unmounting.
+3. **Truthful Error Classification & Inference Limitation Handling:**
+   - **HTTP 503 Service Unavailable:** The backend playground endpoint currently returns 503 because model serving / inference workers are not yet deployed. The UI honestly presents this limitation as `"Model Inference Unavailable"` (reflecting that real inference endpoints are pending model hosting and adapter deployment) and provides a retry action.
+   - **HTTP 422 Validation Error:** Validation rejections are safely rendered as user-readable input warnings (e.g. invalid prompt length or token limits).
+   - **Network & System Errors:** API connection failures and unexpected HTTP statuses are rendered distinctly without masking errors.
+   - **Zero Fabrication:** An error response is never converted into a synthetic translation, and mock translations are never substituted.
+4. **Control Plane / ML Execution Separation:**
+   - In accordance with the Foundry architecture, the FastAPI control plane remains strictly separated from GPU/ML execution. No dummy inference worker was introduced in this checkpoint.
+   - Legacy mock files (`web/lib/playground.ts`) are marked deprecated and retained only for backward reference where needed. Other components (such as `web/components/ReviewPortal.tsx`) continue using their existing mock modules pending their scheduled checkpoint migration.

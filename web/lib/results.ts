@@ -1,4 +1,16 @@
+/**
+ * MIGRATION NOTE (Checkpoint 4):
+ * The results list and detail UI have been migrated to the real Foundry API
+ * via `foundryApi.listExperiments()` and `foundryApi.getExperiment(id)` in `@/lib/api-client`.
+ * Fabricated metrics (BLEU, exact-match ratios, synthetic translations) have been removed
+ * from user-facing workflows.
+ *
+ * This mock file is retained temporarily for internal sub-components,
+ * and is scheduled for complete removal when remaining workflows are migrated.
+ */
+
 export type ResultMetric = {
+
   label: string;
   base: string;
   adapted: string;
