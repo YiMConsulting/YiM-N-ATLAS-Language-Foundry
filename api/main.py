@@ -25,6 +25,7 @@ from foundry.review.human_review import (
 )
 from foundry.datasets.split import DatasetSplit
 from api.schemas.language import Language, LanguageStatus
+from api.schemas.review_evidence import DatasetReviewEvidence
 
 app = FastAPI(
     title="N-ATLaS Language Foundry API",
@@ -158,6 +159,39 @@ def load_processed_splits(
 SPLITS: dict[str, dict[str, Any]] = load_processed_splits()
 
 
+def load_review_evidence(
+    manifests_dir: Path = Path("data/manifests"),
+) -> dict[str, dict[str, Any]]:
+    """Loads and validates offline human review evidence manifests from disk.
+
+    Notes:
+        - Loaded at application startup.
+        - Validated against the DatasetReviewEvidence schema.
+        - Gracefully skips malformed files to prevent startup failure.
+    """
+    evidence_map: dict[str, dict[str, Any]] = {}
+    if not manifests_dir.is_dir():
+        return evidence_map
+
+    for path in sorted(manifests_dir.glob("*_human_review_evidence.json")):
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            DatasetReviewEvidence.model_validate(data)
+            dataset_id = data["dataset_id"]
+            evidence_map[dataset_id] = data
+        except Exception as exc:
+            logger.warning(
+                "Failed to load or validate review evidence from %s: %s",
+                path,
+                exc,
+            )
+    return evidence_map
+
+
+REVIEW_EVIDENCE: dict[str, dict[str, Any]] = load_review_evidence()
+
+
 # Review Requests & Sample Items (Empty until real review sampling is conducted)
 REVIEW_REQUESTS: dict[str, dict[str, Any]] = {}
 SAMPLE_ITEMS: list[dict[str, Any]] = []
@@ -189,6 +223,7 @@ def root():
         "docs_url": "/docs",
         "health_url": "/health",
         "review_requests_url": "/api/v1/review/requests",
+        "review_evidence_url": "/api/v1/datasets/{dataset_id}/review-evidence",
     }
 
 @app.get("/health")
@@ -250,6 +285,22 @@ def list_dataset_splits(dataset_id: str):
         raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found")
     items = [s for s in SPLITS.values() if s.get("dataset_id") == dataset_id]
     return {"items": items, "total": len(items)}
+
+@app.get("/datasets/{dataset_id}/review-evidence")
+@app.get("/api/v1/datasets/{dataset_id}/review-evidence")
+def get_dataset_review_evidence(dataset_id: str):
+    if dataset_id not in DATASETS:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dataset '{dataset_id}' not found",
+        )
+    evidence = REVIEW_EVIDENCE.get(dataset_id)
+    if not evidence:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No human review evidence found for dataset '{dataset_id}'",
+        )
+    return evidence
 
 
 # --- Human Review Endpoints ---

@@ -5,10 +5,12 @@ import { notFound } from "next/navigation";
 import { DatasetStatusBadge } from "@/components/datasets/dataset-status-badge";
 import { ProvenanceCard } from "@/components/datasets/provenance-card";
 import { QualityAuditCard } from "@/components/datasets/quality-audit-card";
+import { ReviewEvidenceCard } from "@/components/datasets/review-evidence-card";
 import { SplitBar } from "@/components/datasets/split-bar";
 import {
   foundryApi,
   type DatasetDto,
+  type DatasetReviewEvidenceDto,
   type DatasetSplitDto,
 } from "@/lib/api-client";
 
@@ -72,6 +74,14 @@ export default async function DatasetDetailPage({ params }: DatasetPageProps) {
     split = null;
   }
 
+  let reviewEvidence: DatasetReviewEvidenceDto | null = null;
+  try {
+    reviewEvidence = await foundryApi.getDatasetReviewEvidence(id);
+  } catch {
+    // If offline review evidence does not exist or API fails, treat as null
+    reviewEvidence = null;
+  }
+
   return (
     <div className="space-y-6">
       <Link
@@ -112,6 +122,8 @@ export default async function DatasetDetailPage({ params }: DatasetPageProps) {
       </div>
 
       <SplitBar split={split} />
+
+      <ReviewEvidenceCard evidence={reviewEvidence} />
     </div>
   );
 }

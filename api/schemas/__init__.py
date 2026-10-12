@@ -19,6 +19,12 @@ from api.schemas.experiment import (
     ExperimentArtifacts,
 )
 
+from api.schemas.review_evidence import (
+    DatasetReviewEvidence,
+    MetricScoreSummary,
+    ReviewerScopeSummary,
+)
+
 __all__ = [
     "Language",
     "LanguageStatus",
@@ -37,4 +43,7 @@ __all__ = [
     "RuntimeConfig",
     "EvaluationMetrics",
     "ExperimentArtifacts",
+    "DatasetReviewEvidence",
+    "MetricScoreSummary",
+    "ReviewerScopeSummary",
 ]

@@ -79,3 +79,6 @@ logs/
 extracted_plan.txt
 parsed_plan.md
 parse_plan.py
+
+# Review Workbooks & Spreadsheets
+docs/*.xlsx

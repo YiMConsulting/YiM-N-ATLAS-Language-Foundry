@@ -923,3 +923,39 @@ To prevent breaking presentation components that render real evaluation metrics 
 - **Single Source of Truth:** `web/lib/api-client.ts` serves as the sole contract boundary between the Next.js frontend and the FastAPI backend control plane (`/api/v1`).
 - **No Synthetic Fallbacks:** All user-facing views render real API records, honest empty states (for empty registries or queues), or explicit unavailable states (HTTP 503 with retry for model inference).
 - **Test Isolation:** Backend tests in `tests/` maintain their own self-contained unit fixtures without polluting production API endpoints or web client bundles.
+
+---
+
+### Integration of Verified Tiv Human-Review Evidence (Workbook Receiver 4)
+
+#### Background & Architectural Objective
+An offline manual review workbook was supplied (`docs/Tiv Translation Pilot - Manual Review Distribution_2.xlsx`) containing native linguist evaluations from evaluator `REV_04` for the Tiv translation pilot.
+
+The objective was to incorporate this empirical evaluation evidence into the N-ATLaS Language Foundry control plane and dataset views without reintroducing mock fixtures or fabricating data.
+
+#### Key Verified Evidence Facts
+1. **Source Scope & Evaluator Coverage:**
+   - Evaluator `REV_04` annotated 51 translation pairs (50 MT560 records, 1 Hypa Text-10k record).
+   - The pilot distributed 203 records across 4 evaluators (`REV_01`, `REV_02`, `REV_03`, `REV_04`).
+   - `REV_04` represents 25.12% manual sample coverage (51 / 203 records). Evaluators `REV_01`, `REV_02`, and `REV_03` remain pending (152 records unannotated).
+2. **Reviewer-Reported Metrics:**
+   - `translation_accurate`: Mean score 4.7647 / 5.0 (39 rows scored 5, 12 rows scored 4).
+   - `meaning_complete`: 100% Yes (51 / 51 rows).
+   - `tiv_naturalness`: Mean score 5.0 / 5.0 (51 / 51 rows scored 5).
+   - `format_acceptable`: 100% Yes (51 / 51 rows).
+3. **Qualitative Notes & Observations:**
+   - Evaluator notes explain specific judgments, such as praising idiomatic Tiv phrasing ("zwa Buter" for English), syntactic ordering, and duplicate input consistency.
+   - Minor score 4 ratings on `translation_accurate` stemmed from identified reference shifts between English and Tiv publication editions (e.g. English page 29 cited as Tiv translation page 11).
+
+#### Architectural Separation: Offline Evidence vs. Interactive Queues
+1. **Preserving Truthful Queues:**
+   - Completed offline review rows are NOT inserted into the interactive `REVIEW_REQUESTS` queue. The interactive review portal (`/review`) continues to display the true pending queue (currently empty).
+   - Interactive review submissions remain process-memory-only until durable persistence is implemented.
+2. **Dedicated Contract & Manifest Pipeline:**
+   - A sanitized, versioned JSON manifest (`data/manifests/tiv_human_review_evidence.json`) captures the aggregated statistics, scope, qualitative notes, and explicit qualifications without committing binary spreadsheets or PII to git.
+   - A dedicated endpoint `GET /api/v1/datasets/{dataset_id}/review-evidence` backed by typed schema `DatasetReviewEvidence` serves this data dynamically.
+   - The dataset detail page (`/datasets/[id]`) renders the `ReviewEvidenceCard` component when evidence exists, displaying the sample progress (25.1%), reviewer scope (1 of 4 evaluators completed), metrics breakdown, and qualitative notes.
+3. **Linguistic Qualification Disclaimer:**
+   - The UI and API explicitly qualify these metrics as reviewer-recorded judgments from evaluator `REV_04` across a 51-record pilot sample, rather than automated whole-dataset certifications or unearned full approvals. The dataset remains in `registered` status.
+4. **Data Governance:**
+   - The raw binary workbook `docs/*.xlsx` is explicitly excluded from version control via `.gitignore`.
