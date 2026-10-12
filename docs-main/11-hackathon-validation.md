@@ -30,7 +30,7 @@ The table below summarizes the core deliverables required for evaluation:
 
 | Deliverable | Status | Location / Reference | Verification Evidence |
 | :--- | :---: | :--- | :--- |
-| **Live Deployed API** | **Verified** | [yim-n-atlas-language-foundry.onrender.com](https://yim-n-atlas-language-foundry.onrender.com) | Live health check at `/healthz`, OpenAPI docs at `/docs`. |
+| **Live Deployed API** | **Verified** | [yim-n-atlas-language-foundry.onrender.com](https://yim-n-atlas-language-foundry.onrender.com) | Live health check at `/health` (`/api/v1/health`, `/healthz`), OpenAPI docs at `/docs`. |
 | **Source Code Repository** | **Verified** | `YiMConsulting/YiM-N-ATLAS-Language-Foundry` | Branch: `feat/james-ml-pipeline`. Clean Git history. |
 | **Comprehensive Documentation** | **Verified** | `docs-main/` | 13 detailed markdown and diagram specifications. |
 | **Automated Test Suite** | **Verified** | `tests/` | 125 passed tests in Docker environment; 0 failures. |
@@ -74,7 +74,7 @@ The challenge criteria require external validation from users outside the core d
 * **Testing Date**: `[YYYY-MM-DD]`
 * **Platform Tested**: `[Hosted Render API / Local Docker / OpenAPI Docs]`
 * **Workflows Executed**:
-  - Tested `GET /healthz` and `GET /api/languages` for metadata clarity.
+  - Tested `GET /health` and `GET /api/v1/languages` for metadata clarity.
   - Inspected dataset split `tiv-mt560-v1-split-42` via API.
   - Executed playground inference request and verified clear HTTP 503 error handling.
 * **Tester Feedback**:
@@ -91,7 +91,7 @@ The challenge criteria require external validation from users outside the core d
 * **Testing Date**: `[YYYY-MM-DD]`
 * **Platform Tested**: `[Hosted Render Web UI / Review Evidence API]`
 * **Workflows Executed**:
-  - Audited human-review evidence endpoint `GET /api/review/evidence/tiv-mt560-v1`.
+  - Audited human-review evidence endpoint `GET /api/v1/datasets/tiv-mt560-v1/review-evidence`.
   - Reviewed qualitative issue categories (loanwords, word order, citation shifts).
   - Evaluated split strategy to confirm prevention of target memorization.
 * **Tester Feedback**:
