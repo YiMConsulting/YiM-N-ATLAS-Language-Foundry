@@ -3,8 +3,12 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const backendUrl =
-      process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
+    const rawBaseURL = (
+      process.env.NEXT_PUBLIC_API_BASE_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      "https://yim-n-atlas-language-foundry.onrender.com/api/v1"
+    ).replace(/\/+$/, "");
+    const backendUrl = rawBaseURL.endsWith("/api/v1") ? rawBaseURL : `${rawBaseURL}/api/v1`;
 
     const res = await fetch(`${backendUrl}/review/submit`, {
       method: "POST",

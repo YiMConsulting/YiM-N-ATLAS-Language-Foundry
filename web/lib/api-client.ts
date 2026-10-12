@@ -1,9 +1,14 @@
 import axios from "axios";
 
-const baseURL = (
+const rawBaseURL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "http://127.0.0.1:8000/api/v1"
+  process.env.NEXT_PUBLIC_API_URL ??
+  "https://yim-n-atlas-language-foundry.onrender.com/api/v1"
 ).replace(/\/+$/, "");
+
+const baseURL = rawBaseURL.endsWith("/api/v1")
+  ? rawBaseURL
+  : `${rawBaseURL}/api/v1`;
 
 export const apiClient = axios.create({
   baseURL,
