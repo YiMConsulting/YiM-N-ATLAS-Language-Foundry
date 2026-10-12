@@ -1,6 +1,5 @@
 import axios from "axios";
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SetupCard } from "@/components/experiments/setup-card";

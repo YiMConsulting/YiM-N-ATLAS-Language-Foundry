@@ -7,10 +7,6 @@ function formatLearningRate(value: number): string {
     : String(value);
 }
 
-function methodLabel(method: Experiment["adaptation"]["method"]): string {
-  return method === "qlora" ? "QLoRA" : "LoRA";
-}
-
 export function TrainingSettingsCard({
   experiment,
 }: {

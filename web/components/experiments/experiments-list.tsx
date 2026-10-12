@@ -2,10 +2,6 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/experiments/status-badge";
 import type { ExperimentDto } from "@/lib/api-client";
 
-function methodLabel(method: Experiment["adaptation"]["method"]): string {
-  return method === "qlora" ? "QLoRA" : "LoRA";
-}
-
 export function ExperimentsList({
   experiments,
 }: {

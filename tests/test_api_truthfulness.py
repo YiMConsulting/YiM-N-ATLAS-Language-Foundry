@@ -199,3 +199,75 @@ def test_submit_review_batch_unknown_dataset_returns_404(client):
     response = client.post("/api/v1/review/submit", json=payload)
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
+
+
+def test_get_dataset_review_evidence_success(client):
+    response = client.get("/api/v1/datasets/tiv-mt560-v1/review-evidence")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["dataset_id"] == "tiv-mt560-v1"
+    assert data["language_code"] == "tiv"
+    assert data["reviewed_records"] == 51
+    assert data["total_sampled_records"] == 203
+    assert data["pending_records"] == 152
+    assert data["reviewer_scope"]["completed_reviewers"] == ["REV_04"]
+    assert "REV_01" in data["reviewer_scope"]["pending_reviewers"]
+    assert data["metrics"]["translation_accurate"]["mean_score"] == 4.7647
+    assert data["metrics"]["tiv_naturalness"]["mean_score"] == 5.0
+    assert data["metrics"]["meaning_complete"]["score_distribution"]["Yes"] == 51
+    assert "reviewer-reported" in data["qualification"].lower()
+
+
+def test_get_dataset_review_evidence_unknown_dataset_returns_404(client):
+    response = client.get("/api/v1/datasets/nonexistent-dataset/review-evidence")
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
+
+
+def test_load_review_evidence_handles_malformed(tmp_path: Path):
+    from api.main import load_review_evidence
+
+    # Valid review evidence manifest
+    valid_data = {
+        "dataset_id": "ds-test-01",
+        "language_code": "tiv",
+        "review_type": "offline_manual_pilot",
+        "artifact_name": "test.xlsx",
+        "sheet_name": "TestSheet",
+        "status": "in_progress",
+        "total_sampled_records": 100,
+        "reviewed_records": 25,
+        "pending_records": 75,
+        "coverage_ratio": 0.25,
+        "sources_breakdown": {"test": 25},
+        "reviewer_scope": {
+            "assigned_reviewers": ["REV_01"],
+            "completed_reviewers": ["REV_01"],
+            "pending_reviewers": []
+        },
+        "metrics": {
+            "acc": {
+                "metric_name": "Acc",
+                "scale": "1-5",
+                "description": "desc",
+                "mean_score": 4.5,
+                "pass_count": 25,
+                "total_count": 25,
+                "score_distribution": {"5": 25}
+            }
+        },
+        "qualitative_findings": ["finding 1"],
+        "qualification": "Test qualification.",
+        "evaluated_at": "2026-10-12T00:00:00Z"
+    }
+    (tmp_path / "tiv_human_review_evidence.json").write_text(json.dumps(valid_data), encoding="utf-8")
+
+    # Malformed JSON
+    (tmp_path / "bad_human_review_evidence.json").write_text("{bad json", encoding="utf-8")
+
+    # Schema invalid (missing required fields)
+    (tmp_path / "invalid_human_review_evidence.json").write_text(json.dumps({"dataset_id": "bad"}), encoding="utf-8")
+
+    loaded = load_review_evidence(tmp_path)
+    assert "ds-test-01" in loaded
+    assert len(loaded) == 1

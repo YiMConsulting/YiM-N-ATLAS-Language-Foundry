@@ -2,9 +2,10 @@
 Implements the v1 API Contract for Problem Statement 1 (Developer Infrastructure).
 """
 
+import os
 from datetime import datetime, timezone
 from typing import Any, List, Optional
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -25,6 +26,7 @@ from foundry.review.human_review import (
 )
 from foundry.datasets.split import DatasetSplit
 from api.schemas.language import Language, LanguageStatus
+from api.schemas.review_evidence import DatasetReviewEvidence
 
 app = FastAPI(
     title="N-ATLaS Language Foundry API",
@@ -32,11 +34,15 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Enable CORS for Next.js frontend (http://localhost:3000) and external beta testers
+# Configurable CORS for Next.js frontend and external deployments
+cors_origins_raw = os.getenv("CORS_ORIGINS", "*")
+allowed_origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()]
+is_wildcard = allowed_origins == ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=allowed_origins if not is_wildcard else ["*"],
+    allow_credentials=not is_wildcard,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -115,9 +121,11 @@ DATASETS: dict[str, dict[str, Any]] = {
 }
 
 def load_processed_splits(
-    base_dir: Path = Path("data/processed"),
+    base_dir: Optional[Path] = None,
+    manifests_dir: Optional[Path] = None,
 ) -> dict[str, dict[str, Any]]:
-    """Discovers and validates split metadata files from processed data directories.
+    """Discovers and validates split metadata files from processed data directories
+    or deployment manifests.
 
     Notes:
         - Loaded at application startup. If new splits are generated on disk,
@@ -126,36 +134,89 @@ def load_processed_splits(
         - Malformed or invalid split files are logged as warnings and skipped,
           ensuring other endpoints and splits remain available.
         - Duplicate split IDs are logged as warnings and the initial occurrence is preserved.
+        - Checks PROCESSED_DATA_DIR / data/processed first, then falls back to data/manifests
+          for clean deployment builds where bulky raw/processed datasets are omitted.
     """
     splits: dict[str, dict[str, Any]] = {}
-    if not base_dir.is_dir():
-        return splits
+    search_dir = base_dir or Path(os.getenv("PROCESSED_DATA_DIR", "data/processed"))
 
-    for split_meta_path in sorted(base_dir.glob("*/split_metadata.json")):
-        try:
-            with split_meta_path.open("r", encoding="utf-8") as f:
-                meta = json.load(f)
-            DatasetSplit.model_validate(meta)
-            split_id = meta["id"]
-            if split_id in splits:
+    if search_dir.is_dir():
+        for split_meta_path in sorted(search_dir.glob("*/split_metadata.json")):
+            try:
+                with split_meta_path.open("r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                DatasetSplit.model_validate(meta)
+                split_id = meta["id"]
+                if split_id in splits:
+                    logger.warning(
+                        "Duplicate split ID '%s' found in %s; preserving existing entry.",
+                        split_id,
+                        split_meta_path,
+                    )
+                    continue
+                splits[split_id] = meta
+            except Exception as exc:
                 logger.warning(
-                    "Duplicate split ID '%s' found in %s; preserving existing entry.",
-                    split_id,
+                    "Failed to load or validate split metadata from %s: %s",
                     split_meta_path,
+                    exc,
                 )
-                continue
-            splits[split_id] = meta
-        except Exception as exc:
-            logger.warning(
-                "Failed to load or validate split metadata from %s: %s",
-                split_meta_path,
-                exc,
-            )
+
+    # Standalone manifest fallback for deployment without bulky processed datasets
+    m_dir = manifests_dir if manifests_dir is not None else (Path("data/manifests") if base_dir is None else None)
+    if m_dir and m_dir.is_dir():
+        for manifest_path in sorted(m_dir.glob("*split_metadata.json")):
+            try:
+                with manifest_path.open("r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                DatasetSplit.model_validate(meta)
+                split_id = meta["id"]
+                if split_id not in splits:
+                    splits[split_id] = meta
+            except Exception as exc:
+                logger.warning(
+                    "Failed to load or validate split metadata manifest from %s: %s",
+                    manifest_path,
+                    exc,
+                )
 
     return splits
 
 
 SPLITS: dict[str, dict[str, Any]] = load_processed_splits()
+
+
+def load_review_evidence(
+    manifests_dir: Path = Path("data/manifests"),
+) -> dict[str, dict[str, Any]]:
+    """Loads and validates offline human review evidence manifests from disk.
+
+    Notes:
+        - Loaded at application startup.
+        - Validated against the DatasetReviewEvidence schema.
+        - Gracefully skips malformed files to prevent startup failure.
+    """
+    evidence_map: dict[str, dict[str, Any]] = {}
+    if not manifests_dir.is_dir():
+        return evidence_map
+
+    for path in sorted(manifests_dir.glob("*_human_review_evidence.json")):
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            DatasetReviewEvidence.model_validate(data)
+            dataset_id = data["dataset_id"]
+            evidence_map[dataset_id] = data
+        except Exception as exc:
+            logger.warning(
+                "Failed to load or validate review evidence from %s: %s",
+                path,
+                exc,
+            )
+    return evidence_map
+
+
+REVIEW_EVIDENCE: dict[str, dict[str, Any]] = load_review_evidence()
 
 
 # Review Requests & Sample Items (Empty until real review sampling is conducted)
@@ -179,6 +240,23 @@ class BatchSubmitRequest(BaseModel):
     submitted_at: Optional[str] = None
 
 
+# Security & Demo Write Configuration
+READ_ONLY_MODE = os.getenv("READ_ONLY_MODE", "false").lower() in ("true", "1", "yes")
+ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "").strip()
+
+
+def verify_write_permission(authorization: Optional[str] = None) -> None:
+    if READ_ONLY_MODE:
+        if ADMIN_API_KEY and authorization:
+            expected = f"Bearer {ADMIN_API_KEY}"
+            if authorization == expected or authorization == ADMIN_API_KEY:
+                return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Public review submission is disabled in demonstration mode. The API is currently configured for read-only demonstration.",
+        )
+
+
 # --- Core Health & Info ---
 @app.get("/")
 def root():
@@ -186,9 +264,11 @@ def root():
         "service": "N-ATLAS Language Foundry Control Plane",
         "status": "healthy",
         "version": "0.1.0",
+        "read_only_mode": READ_ONLY_MODE,
         "docs_url": "/docs",
         "health_url": "/health",
         "review_requests_url": "/api/v1/review/requests",
+        "review_evidence_url": "/api/v1/datasets/{dataset_id}/review-evidence",
     }
 
 @app.get("/health")
@@ -251,6 +331,22 @@ def list_dataset_splits(dataset_id: str):
     items = [s for s in SPLITS.values() if s.get("dataset_id") == dataset_id]
     return {"items": items, "total": len(items)}
 
+@app.get("/datasets/{dataset_id}/review-evidence")
+@app.get("/api/v1/datasets/{dataset_id}/review-evidence")
+def get_dataset_review_evidence(dataset_id: str):
+    if dataset_id not in DATASETS:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dataset '{dataset_id}' not found",
+        )
+    evidence = REVIEW_EVIDENCE.get(dataset_id)
+    if not evidence:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No human review evidence found for dataset '{dataset_id}'",
+        )
+    return evidence
+
 
 # --- Human Review Endpoints ---
 @app.get("/review/requests")
@@ -283,7 +379,11 @@ def get_review_samples(request_id: str):
 
 @app.post("/review/decisions", status_code=status.HTTP_201_CREATED)
 @app.post("/api/v1/review/decisions", status_code=status.HTTP_201_CREATED)
-def submit_single_decision(payload: SubmitDecisionRequest):
+def submit_single_decision(
+    payload: SubmitDecisionRequest,
+    authorization: Optional[str] = Header(None),
+):
+    verify_write_permission(authorization)
     if payload.review_request_id not in REVIEW_REQUESTS:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -318,7 +418,11 @@ def submit_single_decision(payload: SubmitDecisionRequest):
 @app.post("/review/submit", status_code=status.HTTP_201_CREATED)
 @app.post("/api/v1/review/submit", status_code=status.HTTP_201_CREATED)
 @app.post("/api/reviews/submit", status_code=status.HTTP_201_CREATED)
-def submit_review_batch(batch: BatchSubmitRequest):
+def submit_review_batch(
+    batch: BatchSubmitRequest,
+    authorization: Optional[str] = Header(None),
+):
+    verify_write_permission(authorization)
     if batch.dataset_id not in DATASETS:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

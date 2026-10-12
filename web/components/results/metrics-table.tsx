@@ -1,5 +1,5 @@
 import { ChangeValue } from "@/components/results/change-value";
-import type { ResultMetric } from "@/lib/results";
+import type { ResultMetric } from "@/lib/api-client";
 
 export function MetricsTable({ metrics }: { metrics: ResultMetric[] }) {
   return (
@@ -23,11 +23,7 @@ export function MetricsTable({ metrics }: { metrics: ResultMetric[] }) {
               <td className="px-4 py-3 text-muted">{metric.base}</td>
               <td className="px-4 py-3 text-muted">{metric.adapted}</td>
               <td className="px-4 py-3">
-                <ChangeValue
-                  delta={metric.delta}
-                  displayChange={metric.displayChange}
-                  direction={metric.direction}
-                />
+                <ChangeValue metric={metric} />
               </td>
             </tr>
           ))}

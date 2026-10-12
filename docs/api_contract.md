@@ -405,6 +405,7 @@ backend. The base prefix is `/api/v1`.
   `POST`            `/datasets/{dataset_id}/splits`            Create split        Proposed
   `GET`             `/datasets/{dataset_id}/splits`            List dataset splits Implemented (verified)
   `GET`             `/splits/{split_id}`                       Split details       Implemented (verified)
+  `GET`             `/datasets/{dataset_id}/review-evidence`   Review evidence     Implemented (verified)
 
   `GET`             `/experiments`                             List/filter         Proposed
 
@@ -640,6 +641,87 @@ Target response: `200 OK` or `201 Created` with `QualityAudit`:
      "notes": "Reviewed and verified."
    }
    ```
+
+5. **Persistence Model & State Limitations:**
+   Interactive review requests and decisions (`/review/requests`, `/review/decisions`, `/review/decisions/batch`) are currently stored in process memory only. They do not survive an API service restart until durable database persistence is provisioned.
+
+6. **Dataset Review Evidence (Offline Verification Pilot):**
+   `GET /datasets/{dataset_id}/review-evidence`
+   (Also mounted under `/api/v1/datasets/{dataset_id}/review-evidence`)
+
+   Retrieves verified offline human review evidence for a dataset loaded from sanitized provenance manifests (`data/manifests/*_human_review_evidence.json`). This separates completed offline evaluation pilots (e.g. native linguist workbook reviews) from the interactive review queue.
+
+   Response: `200 OK` with `DatasetReviewEvidence`:
+   ``` json
+   {
+     "dataset_id": "tiv-mt560-v1",
+     "language_code": "tiv",
+     "artifact_name": "Tiv Translation Pilot - Manual Review Distribution_2.xlsx",
+     "evidence_source": "data/manifests/tiv_human_review_evidence.json",
+     "reviewed_records_count": 51,
+     "total_distributed_records": 203,
+     "review_coverage_pct": 25.12,
+     "source_scope": {
+       "mt560_records": 50,
+       "hypa_records": 1
+     },
+     "reviewer_scope": {
+       "completed_evaluators": ["REV_04"],
+       "pending_evaluators": ["REV_01", "REV_02", "REV_03"],
+       "total_planned_evaluators": 4,
+       "evaluators_completed_count": 1
+     },
+     "metric_summaries": {
+       "translation_accurate": {
+         "metric": "translation_accurate",
+         "scale": "1-5 integer scale",
+         "count": 51,
+         "mean": 4.7647,
+         "min": 4.0,
+         "max": 5.0,
+         "score_breakdown": { "5": 39, "4": 12 },
+         "definition": "Accuracy of translated meaning against source English text."
+       },
+       "meaning_complete": {
+         "metric": "meaning_complete",
+         "scale": "binary (Yes/No)",
+         "count": 51,
+         "mean": 1.0,
+         "pass_count": 51,
+         "definition": "Whether the core meaning is fully retained without omissions."
+       },
+       "tiv_naturalness": {
+         "metric": "tiv_naturalness",
+         "scale": "1-5 integer scale",
+         "count": 51,
+         "mean": 5.0,
+         "min": 5.0,
+         "max": 5.0,
+         "score_breakdown": { "5": 51 },
+         "definition": "Fluency, idiomatic phrasing, and naturalness in native Tiv."
+       },
+       "format_acceptable": {
+         "metric": "format_acceptable",
+         "scale": "binary (Yes/No)",
+         "count": 51,
+         "mean": 1.0,
+         "pass_count": 51,
+         "definition": "Punctuation, casing, and structure adherence."
+       }
+     },
+     "qualitative_observations": [
+       "Reviewer notes highlight idiomatic Tiv phrasing such as 'zwa Buter' (English language) and valid syntactic ordering.",
+       "Reviewer identified minor reference shifts (e.g. English page 29 cited as Tiv translation page 11) accounting for score 4 ratings.",
+       "Reviewer noted repeated identical English source inputs with consistent, faithful translations."
+     ],
+     "qualification_disclaimer": "These figures represent reviewer-recorded qualitative judgments from evaluator REV_04 across a sample of 51 records (25.1% of the 203-record pilot distribution), not automated or independently verified full-dataset quality certifications.",
+     "recorded_at": "2026-10-12T11:00:00Z"
+   }
+   ```
+
+   Status codes:
+   - `200 OK`: Evidence found and returned.
+   - `404 Not Found`: Dataset unknown or no offline review evidence exists for the dataset.
 
 ### Create split
 

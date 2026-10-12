@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { AddLanguageButton } from "@/components/languages/add-language-button";
 import { LanguageList } from "@/components/languages/language-list";
 import { foundryApi, type LanguageDto } from "@/lib/api-client";
@@ -47,14 +46,4 @@ export default async function LanguagesPage() {
       )}
     </div>
   );
-}
-
-async function LanguagesSection() {
-  const { items } = await getLanguages();
-
-  if (items.length === 0) {
-    return <p className="text-sm text-muted">No languages registered yet.</p>;
-  }
-
-  return <LanguageList languages={items} />;
 }

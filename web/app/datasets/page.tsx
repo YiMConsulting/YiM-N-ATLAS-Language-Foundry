@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { DatasetList } from "@/components/datasets/dataset-list";
 import { foundryApi, type DatasetDto } from "@/lib/api-client";
 
@@ -44,14 +43,4 @@ export default async function DatasetsPage() {
       )}
     </div>
   );
-}
-
-async function DatasetsSection() {
-  const { items } = await getDatasets();
-
-  if (items.length === 0) {
-    return <p className="text-sm text-muted">No datasets registered yet.</p>;
-  }
-
-  return <DatasetList datasets={items} />;
 }

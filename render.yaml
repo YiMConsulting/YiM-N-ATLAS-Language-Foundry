@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: natlas-foundry-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: READ_ONLY_MODE
+        value: "true"
+      - key: PROCESSED_DATA_DIR
+        value: "data/processed"

@@ -1,0 +1,87 @@
+{
+  "dataset_id": "tiv-mt560-v1",
+  "language_code": "tiv",
+  "review_type": "offline_manual_pilot",
+  "artifact_name": "Tiv Translation Pilot - Manual Review Distribution_2.xlsx",
+  "sheet_name": "Receiver 4",
+  "status": "in_progress",
+  "total_sampled_records": 203,
+  "reviewed_records": 51,
+  "pending_records": 152,
+  "coverage_ratio": 0.2512,
+  "sources_breakdown": {
+    "mt560": 50,
+    "hypa": 1
+  },
+  "reviewer_scope": {
+    "assigned_reviewers": [
+      "REV_01",
+      "REV_02",
+      "REV_03",
+      "REV_04"
+    ],
+    "completed_reviewers": [
+      "REV_04"
+    ],
+    "pending_reviewers": [
+      "REV_01",
+      "REV_02",
+      "REV_03"
+    ]
+  },
+  "metrics": {
+    "translation_accurate": {
+      "metric_name": "Translation Accuracy",
+      "scale": "1-5",
+      "description": "Fidelity of translated meaning compared to source English sentence (5 = Perfectly accurate, 4 = Accurate with minor nuance differences).",
+      "mean_score": 4.7647,
+      "pass_count": 51,
+      "total_count": 51,
+      "score_distribution": {
+        "4": 12,
+        "5": 39
+      }
+    },
+    "meaning_complete": {
+      "metric_name": "Meaning Completeness",
+      "scale": "yes/no",
+      "description": "Preservation of full meaning without omissions or hallucinations.",
+      "mean_score": null,
+      "pass_count": 51,
+      "total_count": 51,
+      "score_distribution": {
+        "Yes": 51
+      }
+    },
+    "tiv_naturalness": {
+      "metric_name": "Tiv Naturalness",
+      "scale": "1-5",
+      "description": "Fluency and idiomatic phrasing in native Tiv (5 = Highly fluent native Tiv phrasing).",
+      "mean_score": 5.0,
+      "pass_count": 51,
+      "total_count": 51,
+      "score_distribution": {
+        "5": 51
+      }
+    },
+    "format_acceptable": {
+      "metric_name": "Formatting Acceptability",
+      "scale": "yes/no",
+      "description": "Correct preservation of punctuation, casing, quotes, brackets, and alphanumeric tokens.",
+      "mean_score": null,
+      "pass_count": 51,
+      "total_count": 51,
+      "score_distribution": {
+        "Yes": 51
+      }
+    }
+  },
+  "qualitative_findings": [
+    "Native idiomatic phrasing consistently validated (e.g. 'zwa Buter' for English language).",
+    "Score 4 annotations occurred primarily on external page-number shifts (e.g., page 29 in source English referenced as page 11 in target Tiv publication edition).",
+    "Alphanumeric structured reference tokens (e.g., 'A - D ) .') and standard biblical orthography ('Ekesodu') correctly maintained across parallel segments.",
+    "Lexical repetition in historic slogans ('yôô nen , yôô nen') verified as grammatically appropriate imperative emphasis in natural Tiv."
+  ],
+  "qualification": "Reviewer-reported and reviewer-recorded judgments from evaluator REV_04 during the manual pilot. These figures represent sample observations (51/203 pairs) and do not constitute independent automated quality verification or complete dataset sign-off.",
+  "evaluated_at": "2026-10-12T10:00:00Z"
+}
