@@ -4,13 +4,15 @@ Welcome to the N-ATLaS Language Foundry Beta Testing Program. This guide provide
 
 ---
 
-## 1. Overview & Public Endpoint
+## 1. Overview & Public Endpoints
 
-The N-ATLaS Language Foundry control plane is publicly deployed on Render:
+The N-ATLaS Language Foundry control plane is publicly deployed on Render and also runs locally via Docker:
 
-* **Deployment URL**: [https://yim-n-atlas-language-foundry.onrender.com](https://yim-n-atlas-language-foundry.onrender.com)
-* **Interactive OpenAPI Docs**: [https://yim-n-atlas-language-foundry.onrender.com/docs](https://yim-n-atlas-language-foundry.onrender.com/docs)
-* **Raw OpenAPI Specification**: [https://yim-n-atlas-language-foundry.onrender.com/openapi.json](https://yim-n-atlas-language-foundry.onrender.com/openapi.json)
+* **Production Deployed URL**: [https://yim-n-atlas-language-foundry.onrender.com](https://yim-n-atlas-language-foundry.onrender.com)
+* **Local Development Base URL**: `http://localhost:8000`
+* **Interactive OpenAPI Swagger Docs**: [https://yim-n-atlas-language-foundry.onrender.com/docs](https://yim-n-atlas-language-foundry.onrender.com/docs)
+* **Interactive ReDoc Specification**: [https://yim-n-atlas-language-foundry.onrender.com/redoc](https://yim-n-atlas-language-foundry.onrender.com/redoc)
+* **Raw OpenAPI Specification (JSON)**: [https://yim-n-atlas-language-foundry.onrender.com/openapi.json](https://yim-n-atlas-language-foundry.onrender.com/openapi.json)
 * **Target Audience**: Hackathon reviewers, external testers, linguists, and backend engineers.
 
 > [!NOTE]
@@ -24,117 +26,360 @@ When testing the platform, explore features in the recommended workflow sequence
 
 ```mermaid
 flowchart LR
-    A["1. Health & Status\n(/healthz)"] --> B["2. Language Catalog\n(/api/languages)"]
-    B --> C["3. Dataset Provenance\n(/api/datasets)"]
-    C --> D["4. Split Metadata\n(/api/splits/...)"]
-    D --> E["5. Human Review\n(/api/review/evidence/...)"]
-    E --> F["6. Experiment Registry\n(/api/experiments)"]
-    F --> G["7. Inference Playground\n(/api/playground/generate)"]
+    A["1. Health & Status\n(/health, /api/v1/health)"] --> B["2. Language Catalog\n(/api/v1/languages)"]
+    B --> C["3. Dataset Provenance\n(/api/v1/datasets)"]
+    C --> D["4. Split Metadata\n(/api/v1/splits/...)"]
+    D --> E["5. Human Review Evidence\n(/api/v1/datasets/.../review-evidence)"]
+    E --> F["6. Experiment Registry\n(/api/v1/experiments)"]
+    F --> G["7. Inference Playground\n(/api/v1/playground/generate)"]
 ```
 
 ### Feature Exploration Order
 
 | Step | Component | Endpoint / View | What to Validate |
 | :--- | :--- | :--- | :--- |
-| **1** | **System Health** | `GET /healthz` | Confirms container liveness, application uptime, and read-only demo mode status (`read_only_demo: true`). |
-| **2** | **Language Registry** | `GET /api/languages` | Verifies language registry metadata, specifically the pilot language **Tiv** (`tiv`, Niger-Congo, Benue-Congo, Tivoid). |
-| **3** | **Dataset Provenance** | `GET /api/datasets` | Audits the canonical dataset `tiv-mt560-v1` metadata, source URI, license (`CC BY 4.0`), and record statistics. |
-| **4** | **Split Verification** | `GET /api/splits/tiv-mt560-v1-split-42` | Verifies deterministic partitioning (138,074 train, 18,410 val, 27,615 test) and leakage-free grouped split strategy. |
-| **5** | **Review Evidence** | `GET /api/review/evidence/tiv-mt560-v1` | Inspects sanitized, empirical human evaluation metrics from native speaker reviewer `REV_04` (51 records, 4.76/5 accuracy). |
-| **6** | **Experiments** | `GET /api/experiments` | Audits experiment registry behavior. Confirms clean, empty production registry with zero fabricated mock runs. |
-| **7** | **Inference Playground** | `POST /api/playground/generate` | Confirms system truthfulness: returns `503 Service Unavailable` with descriptive message when GPU inference worker is offline. |
+| **1** | **System Health & Info** | `GET /` & `GET /health` (`/api/v1/health`, `/healthz`) | Confirms container liveness, application uptime, service version (`0.1.0`), and read-only mode status. |
+| **2** | **Language Registry** | `GET /api/v1/languages` & `GET /api/v1/languages/tiv` | Verifies language registry metadata, specifically the pilot language **Tiv** (`tiv`, status `data_available`). |
+| **3** | **Dataset Provenance** | `GET /api/v1/datasets` & `GET /api/v1/datasets/tiv-mt560-v1` | Audits the canonical dataset `tiv-mt560-v1` metadata, version git commit, and clean 184,099 record count. |
+| **4** | **Split Verification** | `GET /api/v1/splits/tiv-mt560-v1-split-42` | Verifies deterministic partitioning (138,074 train, 18,410 val, 27,615 test) and leakage-free grouped split strategy. |
+| **5** | **Review Evidence** | `GET /api/v1/datasets/tiv-mt560-v1/review-evidence` | Inspects sanitized, empirical human evaluation metrics from native speaker reviewer `REV_04` (51 records, 4.76/5 accuracy). |
+| **6** | **Experiments** | `GET /api/v1/experiments` | Audits experiment registry behavior. Confirms clean, empty production registry with zero fabricated mock runs. |
+| **7** | **Inference Playground** | `POST /api/v1/playground/generate` | Confirms system truthfulness: returns `503 Service Unavailable` with descriptive message when GPU inference worker is offline. |
 
 ---
 
 ## 3. Safe API Verification Tasks
 
-You can execute these safe, non-destructive checks using `curl`, Postman, or the browser.
+You can execute these safe, non-destructive checks using `curl`, Postman, or the browser against either the hosted Render endpoint or your local instance (`http://localhost:8000`).
 
-### Task 1: Check System Liveness
+### Task 1: Check System Liveness and Root Service Information
+Test the root endpoint and health check probe:
 ```bash
-curl -s -X GET "https://yim-n-atlas-language-foundry.onrender.com/healthz" | jq .
+# 1. Health check probe
+curl -s -X GET "https://yim-n-atlas-language-foundry.onrender.com/health" | jq .
+
+# 2. Root service info and route index
+curl -s -X GET "https://yim-n-atlas-language-foundry.onrender.com/" | jq .
 ```
-**Expected Output**:
+
+**Expected Health Output (`GET /health`, `/api/v1/health`, or `/healthz`)**:
 ```json
 {
+  "status": "ok",
+  "service": "natlas-foundry-api",
+  "version": "0.1.0",
+  "timestamp": "2026-10-12T18:04:34.007971+00:00"
+}
+```
+
+**Expected Root Output (`GET /`)**:
+```json
+{
+  "service": "N-ATLAS Language Foundry Control Plane",
   "status": "healthy",
   "version": "0.1.0",
-  "read_only_demo": true,
-  "loaded_splits": 1,
-  "loaded_review_evidence": 1
+  "read_only_mode": false,
+  "docs_url": "/docs",
+  "health_url": "/health",
+  "review_requests_url": "/api/v1/review/requests",
+  "review_evidence_url": "/api/v1/datasets/{dataset_id}/review-evidence"
 }
 ```
 
-### Task 2: Retrieve Tiv Language Profile
+---
+
+### Task 2: Retrieve Languages Catalog & Tiv Language Profile
+Retrieve the catalog of tracked Nigerian languages, then query the pilot profile for Tiv:
 ```bash
-curl -s -X GET "https://yim-n-atlas-language-foundry.onrender.com/api/languages" | jq '.languages[] | select(.code == "tiv")'
+# List all registered languages
+curl -s -X GET "https://yim-n-atlas-language-foundry.onrender.com/api/v1/languages" | jq .
+
+# Query Tiv language profile specifically
+curl -s -X GET "https://yim-n-atlas-language-foundry.onrender.com/api/v1/languages/tiv" | jq .
 ```
-**Expected Output**:
+
+**Expected Catalog Output (`GET /api/v1/languages`)**:
 ```json
 {
-  "code": "tiv",
-  "name": "Tiv",
-  "family": "Niger-Congo",
-  "subfamily": "Benue-Congo (Tivoid)",
-  "speakers_estimate": "5,000,000+",
-  "region": "Benue State, Taraba, Nasarawa, Cross River (Nigeria)",
-  "status": "Pilot",
-  "description": "Primary pilot language for N-ATLaS low-resource LoRA adaptation."
+  "items": [
+    {
+      "id": "lang-tiv-001",
+      "code": "tiv",
+      "name": "Tiv",
+      "status": "data_available",
+      "description": "Primary pilot language with verified English-Tiv parallel corpus and splits.",
+      "created_at": "2026-10-12T17:25:00.497063+00:00",
+      "updated_at": "2026-10-12T17:25:00.497063+00:00"
+    },
+    {
+      "id": "lang-igl-002",
+      "code": "igl",
+      "name": "Igala",
+      "status": "discovered",
+      "description": "Exploratory Nigerian language under provenance and corpus investigation.",
+      "created_at": "2026-10-12T17:25:00.497063+00:00",
+      "updated_at": "2026-10-12T17:25:00.497063+00:00"
+    },
+    {
+      "id": "lang-yor-003",
+      "code": "yor",
+      "name": "Yoruba",
+      "status": "discovered",
+      "description": "Benchmark Nigerian language supported in base N-ATLaS model.",
+      "created_at": "2026-10-12T17:25:00.497063+00:00",
+      "updated_at": "2026-10-12T17:25:00.497063+00:00"
+    },
+    {
+      "id": "lang-ha-004",
+      "code": "ha",
+      "name": "Hausa",
+      "status": "discovered",
+      "description": "Benchmark Nigerian language supported in base N-ATLaS model.",
+      "created_at": "2026-10-12T17:25:00.497063+00:00",
+      "updated_at": "2026-10-12T17:25:00.497063+00:00"
+    },
+    {
+      "id": "lang-ibo-005",
+      "code": "ibo",
+      "name": "Igbo",
+      "status": "discovered",
+      "description": "Benchmark Nigerian language supported in base N-ATLaS model.",
+      "created_at": "2026-10-12T17:25:00.497063+00:00",
+      "updated_at": "2026-10-12T17:25:00.497063+00:00"
+    }
+  ],
+  "total": 5
 }
 ```
 
-### Task 3: Inspect Verified Split Integrity
+---
+
+### Task 3: Inspect Dataset Provenance and Verified Split Integrity
+Inspect the canonical dataset registration for `tiv-mt560-v1` and verify the exact deterministic split:
 ```bash
-curl -s -X GET "https://yim-n-atlas-language-foundry.onrender.com/api/splits/tiv-mt560-v1-split-42" | jq .
+# Query the canonical dataset metadata
+curl -s -X GET "https://yim-n-atlas-language-foundry.onrender.com/api/v1/datasets/tiv-mt560-v1" | jq .
+
+# Query the deterministic split partition
+curl -s -X GET "https://yim-n-atlas-language-foundry.onrender.com/api/v1/splits/tiv-mt560-v1-split-42" | jq .
 ```
-**Expected Output**:
+
+**Expected Dataset Output (`GET /api/v1/datasets/tiv-mt560-v1`)**:
 ```json
 {
+  "id": "tiv-mt560-v1",
+  "language_code": "tiv",
+  "name": "Tiv MT560 Parallel Corpus V1",
+  "description": "English-Tiv sentence pairs from MT560 with deterministic grouped splitting.",
+  "format": "jsonl",
+  "source_type": "research",
+  "record_count": 184099,
+  "train_records": 138074,
+  "validation_records": 18410,
+  "test_records": 27615,
   "split_id": "tiv-mt560-v1-split-42",
+  "provenance_id": "prov-tiv-mt560",
+  "version": "252074f0d4c82c0005099b5eb4043fddc43026f1",
+  "status": "registered",
+  "local_path": "data/processed/tiv-mt560-v1",
+  "created_at": "2026-10-12T17:25:00.497063+00:00",
+  "updated_at": "2026-10-12T17:25:00.497063+00:00"
+}
+```
+
+**Expected Split Output (`GET /api/v1/splits/tiv-mt560-v1-split-42`)**:
+```json
+{
+  "id": "tiv-mt560-v1-split-42",
   "dataset_id": "tiv-mt560-v1",
   "strategy": "grouped_by_input",
   "seed": 42,
-  "train_count": 138074,
-  "validation_count": 18410,
-  "test_count": 27615,
-  "total_count": 184099,
-  "created_at": "2026-04-06T15:00:00Z"
+  "train_ratio": 0.75,
+  "validation_ratio": 0.1,
+  "test_ratio": 0.15,
+  "total_records": 184099,
+  "train_records": 138074,
+  "validation_records": 18410,
+  "test_records": 27615,
+  "created_at": "2026-10-11T02:21:58.238666Z"
 }
 ```
 
+---
+
 ### Task 4: Inspect Sanitized Human Review Metrics
+Inspect the verified empirical human evaluation metrics extracted from native speaker reviewer `REV_04`:
 ```bash
-curl -s -X GET "https://yim-n-atlas-language-foundry.onrender.com/api/review/evidence/tiv-mt560-v1" | jq .
+curl -s -X GET "https://yim-n-atlas-language-foundry.onrender.com/api/v1/datasets/tiv-mt560-v1/review-evidence" | jq .
 ```
-**Expected Output**:
-* Shows 51 total reviewed records.
-* Mean translation accuracy score of `4.7647 / 5`.
-* 100% meaning completeness, 5.0 naturalness, and 100% format acceptability.
-* Identifies qualitative flags (e.g., loanword usage, word order, citation shifts).
+
+**Expected Output (`GET /api/v1/datasets/tiv-mt560-v1/review-evidence`)**:
+```json
+{
+  "dataset_id": "tiv-mt560-v1",
+  "language_code": "tiv",
+  "review_type": "offline_manual_pilot",
+  "artifact_name": "Tiv Translation Pilot - Manual Review Distribution_2.xlsx",
+  "sheet_name": "Receiver 4",
+  "status": "in_progress",
+  "total_sampled_records": 203,
+  "reviewed_records": 51,
+  "pending_records": 152,
+  "coverage_ratio": 0.2512,
+  "sources_breakdown": {
+    "mt560": 50,
+    "hypa": 1
+  },
+  "reviewer_scope": {
+    "assigned_reviewers": [
+      "REV_01",
+      "REV_02",
+      "REV_03",
+      "REV_04"
+    ],
+    "completed_reviewers": [
+      "REV_04"
+    ],
+    "pending_reviewers": [
+      "REV_01",
+      "REV_02",
+      "REV_03"
+    ]
+  },
+  "metrics": {
+    "translation_accurate": {
+      "metric_name": "Translation Accuracy",
+      "scale": "1-5",
+      "description": "Fidelity of translated meaning compared to source English sentence (5 = Perfectly accurate, 4 = Accurate with minor nuance differences).",
+      "mean_score": 4.7647,
+      "pass_count": 51,
+      "total_count": 51,
+      "score_distribution": {
+        "4": 12,
+        "5": 39
+      }
+    },
+    "meaning_complete": {
+      "metric_name": "Meaning Completeness",
+      "scale": "yes/no",
+      "description": "Preservation of full meaning without omissions or hallucinations.",
+      "mean_score": null,
+      "pass_count": 51,
+      "total_count": 51,
+      "score_distribution": {
+        "Yes": 51
+      }
+    },
+    "tiv_naturalness": {
+      "metric_name": "Tiv Naturalness",
+      "scale": "1-5",
+      "description": "Fluency and idiomatic phrasing in native Tiv (5 = Highly fluent native Tiv phrasing).",
+      "mean_score": 5.0,
+      "pass_count": 51,
+      "total_count": 51,
+      "score_distribution": {
+        "5": 51
+      }
+    },
+    "format_acceptable": {
+      "metric_name": "Formatting Acceptability",
+      "scale": "yes/no",
+      "description": "Correct preservation of punctuation, casing, quotes, brackets, and alphanumeric tokens.",
+      "mean_score": null,
+      "pass_count": 51,
+      "total_count": 51,
+      "score_distribution": {
+        "Yes": 51
+      }
+    }
+  },
+  "qualitative_findings": [
+    "Native idiomatic phrasing consistently validated (e.g. 'zwa Buter' for English language).",
+    "Score 4 annotations occurred primarily on external page-number shifts (e.g., page 29 in source English referenced as page 11 in target Tiv publication edition).",
+    "Alphanumeric structured reference tokens (e.g., 'A - D ) .') and standard biblical orthography ('Ekesodu') correctly maintained across parallel segments.",
+    "Lexical repetition in historic slogans ('yôô nen , yôô nen') verified as grammatically appropriate imperative emphasis in natural Tiv."
+  ],
+  "qualification": "Reviewer-reported and reviewer-recorded judgments from evaluator REV_04 during the manual pilot. These figures represent sample observations (51/203 pairs) and do not constitute independent automated quality verification or complete dataset sign-off.",
+  "evaluated_at": "2026-10-12T10:00:00Z"
+}
+```
+
+---
 
 ### Task 5: Verify Playground Inference Truthfulness
-Submit an inference request to test the backend response:
+Submit an inference request conforming to the `PlaygroundRequest` OpenAPI schema to test the backend response:
 ```bash
-curl -s -X POST "https://yim-n-atlas-language-foundry.onrender.com/api/playground/generate" \
+curl -i -s -X POST "https://yim-n-atlas-language-foundry.onrender.com/api/v1/playground/generate" \
   -H "Content-Type: application/json" \
   -d '{
-    "model_id": "NCAIR1/N-ATLaS",
     "prompt": "Translate the following English text into Tiv:\nGood morning.",
-    "temperature": 0.7,
-    "max_new_tokens": 64
-  }' | jq .
+    "language_code": "tiv",
+    "max_new_tokens": 128,
+    "do_sample": false
+  }'
 ```
+
 **Expected Output**:
 * HTTP Status: `503 Service Unavailable`
+* Response Header: `content-type: application/json`
 * JSON payload:
 ```json
 {
-  "detail": "Inference backend is currently offline. Model weights (8B parameters) require dedicated GPU compute and are not hosted on this demo instance."
+  "detail": "Model inference is currently unavailable. Real inference endpoints are pending model hosting and adapter deployment."
 }
 ```
 
 > [!IMPORTANT]
 > **Understanding HTTP 503 in the Playground**: Receiving an HTTP 503 is **expected and correct** behavior on the hosted instance. Do **not** log an HTTP 503 in the playground as a bug or broken endpoint. It represents strict system truthfulness: the platform refuses to return hallucinated or fake translations when real GPU inference is unavailable.
+
+---
+
+### Task 6: Audit Experiment Registry Behavior
+Verify that the production experiment registry is clean and truthful, reporting only real registered experiments without fabricated benchmark runs:
+```bash
+curl -s -X GET "https://yim-n-atlas-language-foundry.onrender.com/api/v1/experiments" | jq .
+```
+
+**Expected Output**:
+```json
+{
+  "items": [],
+  "total": 0
+}
+```
+
+---
+
+### Task 7: Verify Safe Write-Protection Guard
+Test a batch review submission against `POST /api/v1/review/submit` using the `BatchSubmitRequest` schema:
+```bash
+curl -i -s -X POST "https://yim-n-atlas-language-foundry.onrender.com/api/v1/review/submit" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset_id": "tiv-mt560-v1",
+    "reviewer_id": "REV_04",
+    "decisions": []
+  }'
+```
+
+**Expected Output**:
+* In normal mode (`READ_ONLY_MODE=false`), returns HTTP `201 Created`:
+  ```json
+  {
+    "status": "success",
+    "dataset_id": "tiv-mt560-v1",
+    "reviewer_id": "REV_04",
+    "processed_decisions": 0,
+    "message": "Successfully recorded 0 audit decisions.",
+    "timestamp": "2026-10-12T18:00:57.879142+00:00"
+  }
+  ```
+* In protected demonstration mode (`READ_ONLY_MODE=true` without `ADMIN_API_KEY`), returns HTTP `403 Forbidden`:
+  ```json
+  {
+    "detail": "Public review submission is disabled in demonstration mode. The API is currently configured for read-only demonstration."
+  }
+  ```
 
 ---
 
@@ -164,7 +409,7 @@ To protect intellectual property, privacy, and system security during the testin
 * **DO NOT** submit sensitive personal data, proprietary text, or passwords into any form or endpoint.
 * **DO NOT** attempt to paste raw review workbooks, reviewer personal identifying information (PII), or contact details.
 * **DO NOT** attempt denial-of-service, automated credential fuzzing, or load testing against the public Render endpoint.
-* Note that write endpoints (such as `POST /api/review/decision`) are protected in the public instance by a read-only demo guard (`FOUNDRY_READ_ONLY_DEMO=true`) and will return `403 Forbidden`.
+* Note that write endpoints (`POST /api/v1/review/submit` and `POST /api/v1/review/decisions`) are guarded by `READ_ONLY_MODE=true` when configured for protected public demonstrations and will return `403 Forbidden` unless authorized.
 
 ---
 
@@ -189,7 +434,7 @@ If you encounter an unexpected error, confusing interface behavior, or discrepan
 - [ ] API Contract & Documentation
 
 #### 2. Endpoint or Web Page
-`GET /api/...` or `https://yim-n-atlas-language-foundry.onrender.com/...`
+`GET /api/v1/...` or `https://yim-n-atlas-language-foundry.onrender.com/...`
 
 #### 3. Steps to Reproduce
 1. Navigate to ...
