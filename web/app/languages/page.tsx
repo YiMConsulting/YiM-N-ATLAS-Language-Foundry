@@ -34,7 +34,7 @@ export default async function LanguagesPage() {
             Languages registered in the Foundry.
           </p>
         </div>
-        <AddLanguageButton />
+        {/* <AddLanguageButton /> */}
       </div>
 
       {error ? (
