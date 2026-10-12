@@ -1,15 +1,15 @@
 # 🇳🇬 N-ATLAS Language Foundry
 
-> **A Practical Infrastructure Pipeline for Extending N-ATLAS to Underserved Nigerian Languages**  
-> *Submitted to the National AI Innovation Challenge (NAIC 2026)*  
-> **Problem Statement 1:** Developer Infrastructure (Fine-tuning starter kits, adaptation tooling & evaluation playgrounds)  
+> **A Practical Infrastructure Pipeline for Extending N-ATLAS to Underserved Nigerian Languages**
+> *Submitted to the National AI Innovation Challenge (NAIC 2026)*
+> **Problem Statement 1:** Developer Infrastructure (Fine-tuning starter kits, adaptation tooling & evaluation playgrounds)
 > **Initial Laboratory Language:** **Tiv** (`tiv`) *(Transitioned from initial scoping language **Igala** `igl`)*
 
 ---
 
 ## 🌟 1. What We Are Building
 
-**N-ATLAS Language Foundry** is developer infrastructure built around Nigeria’s sovereign foundation model, **N-ATLAS** (`NCAIR1/N-ATLaS`). 
+**N-ATLAS Language Foundry** is developer infrastructure built around Nigeria’s sovereign foundation model, **N-ATLAS** (`NCAIR1/N-ATLaS`).
 
 The Foundry is **not** another foundation model. Instead, it provides a disciplined, repeatable, and verifiable workflow for developers and researchers to systematically adapt N-ATLAS to underrepresented Nigerian languages without prompt-engineering guesswork or unmonitored scripts.
 
