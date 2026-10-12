@@ -791,6 +791,107 @@ Automated verification:
 - The repository's updated 8-bit setup has passed unit tests, but integration through that exact function with the real quantized model remains to be verified.
 - No optimizer update or complete real-data training run has been verified by this checkpoint.
 - The smoke-test loss is not evidence of improved Tiv translation quality.
-- Human linguistic review and source-license review remain outstanding for the exploratory Tiv dataset.
-
 **Next Checkpoint:** Validate the repository's model-setup function and existing training runner against the real 8-bit N-ATLaS model and prepared Tiv dataset. Begin with a controlled, small training run, verify optimizer updates, validation, and adapter checkpoint saving, and record the experiment configuration and artifacts.
+
+---
+
+### API-Backed Datasets UI Integration & Split Metadata Architecture
+
+#### Architectural Decision & Objectives
+In Checkpoint 3, the frontend dataset views (`web/app/datasets/page.tsx` and `web/app/datasets/[id]/page.tsx`) were migrated from hardcoded mock arrays to live, contract-backed backend endpoints via `foundryApi` in `web/lib/api-client.ts`.
+
+Key architectural principles enforced:
+1. **Contract-Backed API as Single Source of Truth:**
+   - The frontend never serves as the authority on dataset counts or partition statistics.
+   - All dataset metadata is fetched via `GET /api/v1/datasets` and `GET /api/v1/datasets/{dataset_id}` conforming strictly to `DatasetDto`.
+   - Nullable fields (e.g. `record_count: null`) are rendered truthfully as `"Unavailable"` rather than zero or inferred values.
+2. **Deterministic Split Metadata from Verified Processed Artifacts:**
+   - The verified Tiv dataset split (`tiv-mt560-v1-split-42`, `grouped_by_input`, seed `42`) was previously built and sealed on disk (`data/processed/tiv-mt560-v1/split_metadata.json`).
+   - Rather than embedding Tiv-specific constants into frontend components or inferring partitions from `record_count`, the backend dynamically discovers verified split metadata on disk and exposes them via `GET /api/v1/splits/{split_id}` and `GET /api/v1/datasets/{dataset_id}/splits`.
+   - The UI displays split statistics (`138,074` train, `18,410` validation, `27,615` test) only when retrieved from this contract-backed source; otherwise, an explicit `"No verified split metadata available"` state is rendered.
+3. **Separation of Provenance, Licensing, and Quality Claims:**
+   - The core `Dataset` schema exposes `provenance_id`, which records an identifier but not verified legal attribution or linguistic approval.
+   - The frontend explicitly renders license and legal status as `"Pending verification"` and automated quality audit checks as pending, preventing unearned claims of dataset readiness or quality approval before audit endpoints are formalized.
+
+#### Split Metadata Loading Implementation & Limitations
+- **Discovery Mechanism:** `api/main.py` implements `load_processed_splits()`, which scans `data/processed/*/split_metadata.json`, validates each payload against the Pydantic `DatasetSplit` schema, and caches valid records in `SPLITS`.
+- **Fault Tolerance:** Malformed JSON files or schema mismatches are logged as observable warnings via `foundry.api` logger and safely skipped without crashing unrelated endpoints. Duplicate split IDs are detected and preserved without silent overwriting.
+- **Runtime Limitations:**
+  - **Container Mount Dependency:** The backend relies on the Docker volume mount `./data:/app/data:z` to access processed artifacts. Environments without this mount will truthfully report 0 splits rather than fabricating data.
+
+---
+
+### API-Backed Experiments & Results UI Integration
+
+#### Architectural Decision & Objectives
+In Checkpoint 4, the experiments and results user interfaces (`/experiments`, `/experiments/[experiment_id]`, `/results`, `/results/[experiment_id]`) were migrated from hardcoded mock arrays (`web/lib/experiments.ts`, `web/lib/results.ts`) to the typed backend API client (`foundryApi.listExperiments()`, `foundryApi.getExperiment(id)`).
+
+Key architectural decisions enforced:
+1. **Truthful Experiment State Representation:**
+   - The experiments list page (`/experiments`) reflects the live state from `GET /api/v1/experiments`. When zero experiments are recorded in the backend store, the UI renders an explicit empty state explaining that no experiments have been recorded yet, avoiding fabricated experiment IDs, dates, and parameters.
+   - Experiment detail routes (`/experiments/[experiment_id]`) resolve dynamically via `foundryApi.getExperiment(id)`. Static route generation based on mock arrays (`generateStaticParams`) was removed to ensure newly registered or dynamically loaded experiments can resolve.
+   - Status code 404 from the backend renders the Next.js `notFound()` page, while network or server exceptions render a distinct error notification without mock data fallbacks.
+2. **Schema Fidelity & Status Preservation:**
+   - Supported statuses align strictly with the backend `ExperimentStatus` enum: `queued`, `running`, `evaluating`, `completed`, `failed`. The UI was updated to explicitly recognize and style `evaluating` without conflating it with other lifecycle phases.
+   - All rendered fields match the Pydantic schema: `id`, `language_code`, `base_model`, `dataset_ids`, `split_id`, `adaptation`, `training`, `runtime`, `status`, `artifacts`, `git_commit`, `created_at`, `updated_at`.
+   - Nullable fields (e.g. ungenerated artifact paths, optional git commit hashes) render as `"Unavailable"` rather than fabricated defaults.
+3. **Elimination of Fabricated Metrics & Results:**
+   - Synthetic evaluation metrics (such as fake +35.8% exact-match improvements, fabricated BLEU/chrF gains, synthetic loss point histories, and synthetic translations) have been removed from user-facing workflows.
+   - Training loss curves are rendered only when real step-by-step metrics are present in the experiment record; otherwise, the UI truthfully states that loss history is unavailable.
+   - The results list (`/results`) and detail (`/results/[experiment_id]`) pages now read genuine evaluation results from `ExperimentDto.base_results` and `ExperimentDto.adapted_results`. If an experiment has not reached `completed` status or does not contain recorded metrics, an honest pending state is displayed.
+4. **Diagnostic Smoke-Test Separation:**
+   - The preliminary Colab N-ATLaS 8-bit smoke test proved gradient computation on a diagnostic batch, but was not a full dataset adaptation run and established no translation evaluation. In accordance with project policy, it is kept separate and not injected as a completed experiment in the API.
+
+---
+
+### API-Backed Playground Integration & Inference Limitations
+
+#### Architectural Decision & Objectives
+In Checkpoint 5, the playground user interface (`web/components/playground/playground.tsx` and `web/app/playground/page.tsx`) was migrated from hardcoded mock datasets, simulated `setTimeout` delays, and fabricated translations (`web/lib/playground.ts`) to the backend API via `foundryApi.listExperiments()` and `foundryApi.generate()` in `web/lib/api-client.ts`.
+
+Key architectural principles enforced:
+1. **Dynamic Experiment Discovery & Readiness Verification:**
+   - The playground experiment selector dynamically queries `GET /api/v1/experiments` on mount.
+   - When the experiment registry is empty, the playground renders an explicit empty state (`"No experiments available in the registry. Model generation requires an active, trained experiment."`) and disables the generation interface.
+   - The UI avoids inventing default experiment IDs, base models, or synthetic language capabilities.
+2. **Strict Backend Contract Integration:**
+   - Generation requests are dispatched to `POST /api/v1/playground/generate` conforming strictly to `PlaygroundRequest` (`prompt`, `language_code`, `experiment_id`, `max_new_tokens`, `do_sample`).
+   - The shared client typed response `PlaygroundResponse` mirrors the API contract (`prompt`, `generated_text`, `language_code`, `model`, `experiment_id`, `latency_ms`).
+   - Request payloads validate inputs (prompt length, token bounds), prevent concurrent submissions during inflight requests, and safely handle component unmounting.
+3. **Truthful Error Classification & Inference Limitation Handling:**
+   - **HTTP 503 Service Unavailable:** The backend playground endpoint currently returns 503 because model serving / inference workers are not yet deployed. The UI honestly presents this limitation as `"Model Inference Unavailable"` (reflecting that real inference endpoints are pending model hosting and adapter deployment) and provides a retry action.
+   - **HTTP 422 Validation Error:** Validation rejections are safely rendered as user-readable input warnings (e.g. invalid prompt length or token limits).
+   - **Network & System Errors:** API connection failures and unexpected HTTP statuses are rendered distinctly without masking errors.
+   - **Zero Fabrication:** An error response is never converted into a synthetic translation, and mock translations are never substituted.
+4. **Control Plane / ML Execution Separation:**
+   - In accordance with the Foundry architecture, the FastAPI control plane remains strictly separated from GPU/ML execution. No dummy inference worker was introduced in this checkpoint.
+   - Legacy mock files (`web/lib/playground.ts`) are marked deprecated and retained only for backward reference where needed.
+
+---
+
+### API-Backed Human-Review Portal Migration & Audit Architecture
+
+#### Architectural Decision & Objectives
+In Checkpoint 6, the human review portal (`web/components/ReviewPortal.tsx` and `web/app/review/page.tsx`) was migrated from hardcoded mock datasets (`web/components/mockReviewData.ts`), simulated proxy routes (`web/app/api/review/`), and fabricated reviewer identities (`olusegun-linguist`) to the typed backend API via `foundryApi` in `web/lib/api-client.ts`.
+
+Key architectural principles enforced:
+1. **Contract-Backed Review Operations:**
+   - The shared client defines typed DTOs mirroring the Pydantic schemas in `foundry.review.human_review` and endpoints in `api/main.py`:
+     - `ReviewRequestDto`: `id`, `dataset_id`, `reviewer_id`, `sample_size`, `status`, `created_at`, `updated_at`.
+     - `ReviewSampleItemDto`: `id`, `review_request_id`, `record_id`, `input_text`, `expected_text`, `context`, `flagged_reason`, `sampled_at`.
+     - `ReviewDecisionRecordDto`: `id`, `review_request_id`, `sample_item_id`, `decision`, `reviewer_id`, `corrected_text`, `notes`, `reviewed_at`.
+     - `HumanReviewSummaryDto`: `review_request_id`, `total_reviewed`, `correct_count`, `incorrect_count`, `needs_correction_count`, `pass_rate`, `status`.
+   - The shared client exposes typed methods: `foundryApi.listReviewRequests()`, `foundryApi.getReviewRequest(id)`, `foundryApi.getReviewSamples(id)`, `foundryApi.submitReviewDecision(payload)`, `foundryApi.submitReviewBatch(payload)`, and `foundryApi.getReviewSummary(id)`.
+2. **Truthful Queue State & Backend Limitations:**
+   - **Empty Queue Representation:** When `foundryApi.listReviewRequests()` returns 0 requests, the portal renders an explicit empty state explaining that review requests are triggered by dataset sampling and quality audit triage.
+   - **Exposing Current Backend Limitations:** While the review schemas (`ReviewRequest`, `ReviewSampleItem`, `ReviewDecisionRecord`, `HumanReviewSummary`) are formally defined in the Foundry architecture, persistent control-plane database storage and automated dataset sampling pipelines are not yet deployed. The UI explicitly states this limitation rather than pretending an active sampling worker exists.
+   - **Dataset Status Integrity:** The Tiv pilot dataset (`tiv-mt560-v1`) remains in `registered` status until native speaker review sampling and provenance audits are recorded.
+3. **Data Integrity & Canonical Decisions:**
+   - The portal enforces canonical decision values: `correct`, `needs_correction`, `incorrect` (matching the `ReviewDecision` enum in `foundry/review/human_review.py`).
+   - For corrections, language-specific orthography toolbars support tone markings and diacritics for Tiv (`ô`, `û`, `gh`, `kp`, `mb`, `sh`, `ts`), Igala, Yoruba, Hausa, and Igbo.
+   - Reviewer identity is not hardcoded to a fabricated persona, but entered by the reviewer and validated.
+   - Batch submissions require active selections and a valid reviewer identity. In-flight requests are protected against duplicate submission. Success confirmations are displayed only upon receiving a genuine HTTP 201 Created response from the API.
+4. **Purging Fabricated Backend Fixtures & Legacy Deprecation:**
+   - In `api/main.py`, placeholder fixtures (`rev_req_igl_001` referencing the deleted `igl-parallel-v1` and 8 fabricated sentences) were purged, returning an empty registry by default until real review requests are sampled.
+   - The contract defect where `get_review_samples` fell back to hardcoded samples on unknown IDs was corrected to return HTTP 404.
+   - Next.js internal routes (`web/app/api/review/samples`, `web/app/api/review/submit`) were stripped of fabricated mock fallbacks, and legacy mock modules (`web/components/mockReviewData.ts`, `web/components/types.ts`) were marked deprecated.

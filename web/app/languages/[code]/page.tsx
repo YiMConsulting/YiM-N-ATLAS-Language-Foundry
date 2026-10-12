@@ -1,3 +1,4 @@
+import axios from "axios";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Suspense } from "react";
@@ -5,9 +6,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isNotFound } from "@/lib/api/errors";
 import { StatusBadge } from "@/components/languages/status-badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { getLanguage, getLanguages } from "@/lib/api/language";
-import type { Language } from "@/lib/languages";
+import { foundryApi, type LanguageDto } from "@/lib/api-client";
 
 type LanguagePageProps = {
   params: Promise<{ code: string }>;
@@ -26,9 +25,8 @@ export async function generateMetadata({
   params,
 }: LanguagePageProps): Promise<Metadata> {
   const { code } = await params;
-
   try {
-    const language = await getLanguage(code);
+    const language = await foundryApi.getLanguage(code);
     return {
       title: `${language.name} | N-ATLAS Language Foundry`,
     };
@@ -39,34 +37,36 @@ export async function generateMetadata({
   }
 }
 
-export async function generateStaticParams() {
-  const { items } = await getLanguages();
-  return items.map((language) => ({ code: language.code }));
-}
+export const instant = false;
 
-export default function LanguageDetailPage({ params }: LanguagePageProps) {
-  return (
-    <Suspense fallback={<Skeleton className="h-96" />}>
-      <LanguageDetail params={params} />
-    </Suspense>
-  );
-}
+export default async function LanguageDetailPage({
 
-async function LanguageDetail({ params }: LanguagePageProps) {
+  params,
+}: LanguagePageProps) {
   const { code } = await params;
 
-  let language: Language | null = null;
+  let language: LanguageDto;
   try {
-    language = await getLanguage(code);
-  } catch (error) {
-    if (isNotFound(error)) {
+    language = await foundryApi.getLanguage(code);
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && err.response?.status === 404) {
       notFound();
     }
-    throw error;
-  }
-
-  if (!language) {
-    notFound();
+    const message =
+      err instanceof Error ? err.message : "Failed to connect to Foundry API.";
+    return (
+      <div className="space-y-6">
+        <Link
+          href="/languages"
+          className="inline-flex items-center gap-1 text-sm text-muted transition-colors hover:text-foreground"
+        >
+          ← Back to languages
+        </Link>
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-600 dark:text-red-400">
+          Failed to load language &ldquo;{code}&rdquo;: {message}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -90,14 +90,31 @@ async function LanguageDetail({ params }: LanguagePageProps) {
       <dl className="overflow-hidden rounded-lg border border-border bg-surface">
         <RecordRow label="ID" value={language.id} />
         <RecordRow label="Name" value={language.name} />
-        <RecordRow label="ISO 639-3 code" value={language.code} />
+        <RecordRow label="Language code" value={language.code} />
         <RecordRow
           label="Status"
           value={<StatusBadge status={language.status} />}
         />
-        <RecordRow label="Description" value={language.description ?? "—"} />
-        <RecordRow label="Created" value={formatDate(language.created_at)} />
-        <RecordRow label="Updated" value={formatDate(language.updated_at)} />
+        <RecordRow
+          label="Description"
+          value={language.description ?? "—"}
+        />
+        <RecordRow
+          label="Registered at"
+          value={
+            language.created_at
+              ? new Date(language.created_at).toLocaleString()
+              : "—"
+          }
+        />
+        <RecordRow
+          label="Last updated"
+          value={
+            language.updated_at
+              ? new Date(language.updated_at).toLocaleString()
+              : "—"
+          }
+        />
       </dl>
     </div>
   );

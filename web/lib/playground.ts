@@ -1,4 +1,15 @@
+/**
+ * MIGRATION NOTE (Checkpoint 5):
+ * The playground UI has been migrated to the real Foundry API
+ * via `foundryApi.listExperiments()` and `foundryApi.generate()` in `@/lib/api-client`.
+ * Fabricated sample translations and simulated local outputs have been removed
+ * from user-facing workflows.
+ *
+ * This mock file is retained temporarily for reference and will be removed in subsequent cleanups.
+ */
+
 export type PlaygroundSample = {
+
   id: string;
   language: string;
   prompt: string;

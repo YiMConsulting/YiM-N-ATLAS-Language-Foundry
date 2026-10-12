@@ -2,15 +2,30 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AddLanguageButton } from "@/components/languages/add-language-button";
 import { LanguageList } from "@/components/languages/language-list";
-import { Skeleton } from "@/components/ui/skeleton";
-import { getLanguages } from "@/lib/api/language";
+import { foundryApi, type LanguageDto } from "@/lib/api-client";
 
 export const metadata: Metadata = {
   title: "Languages | N-ATLAS Language Foundry",
   description: "Languages registered in the N-ATLAS Language Foundry.",
 };
 
-export default function LanguagesPage() {
+export const instant = false;
+
+export default async function LanguagesPage() {
+
+  let languages: LanguageDto[] = [];
+  let error: string | null = null;
+
+  try {
+    const res = await foundryApi.listLanguages();
+    languages = res.items;
+  } catch (err: unknown) {
+    error =
+      err instanceof Error
+        ? err.message
+        : "Failed to connect to Foundry API.";
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -23,9 +38,13 @@ export default function LanguagesPage() {
         {/* <AddLanguageButton /> */}
       </div>
 
-      <Suspense fallback={<Skeleton className="h-40" />}>
-        <LanguagesSection />
-      </Suspense>
+      {error ? (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-600 dark:text-red-400">
+          Failed to load languages: {error}
+        </div>
+      ) : (
+        <LanguageList languages={languages} />
+      )}
     </div>
   );
 }
