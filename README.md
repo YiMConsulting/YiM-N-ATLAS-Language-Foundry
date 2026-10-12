@@ -64,6 +64,7 @@ A foundational pillar of the N-ATLaS Language Foundry is **strict data truthfuln
 | **AI/ML + Backend Lead** | **James** | N-ATLAS Training Pipeline, Quality Audits & FastAPI Backend | Canonical data schema, quality auditor, human review schemas, N-ATLaS tokenization & collator, LoRA adaptation, evaluation engine, Dockerized API |
 | **Full-Stack Frontend Lead** | **Gilbert** | Developer Dashboard & Playground UI | Next.js app, language registry, dataset audit UI, experiment status monitor, base-vs-adapted comparison playground |
 | **Full-Stack Developer & Documentation** | **Joel** | Frontend/backend support and developer documentation | Supports frontend and backend implementation while improving setup guidance, README clarity, and developer onboarding documentation |
+| **Team Lead & Founder (Y-SI Lab)** | **yemisolves** | Leadership Oversight and Management | Leads planning, coordinates contributors, resolves blockers, tracks milestones, and keeps language adaptation work on schedule |
 
 ---
 
