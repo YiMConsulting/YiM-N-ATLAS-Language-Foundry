@@ -1,191 +1,198 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import axios from "axios";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { CheckIcon, XIcon } from "@/components/icons";
-import { MOCK_IGALA_SAMPLES } from "./mockReviewData";
-import type {
-  ReviewSample,
-  ReviewDecision,
-  ReviewItemDecision,
-  ReviewSubmissionPayload,
-} from "./types";
+import { Select } from "@/components/ui/select";
+import {
+  foundryApi,
+  type ReviewRequestDto,
+  type ReviewSampleItemDto,
+  type ReviewDecision,
+  type BatchSubmitResponseDto,
+} from "@/lib/api-client";
 import { useLanguage } from "@/components/layout/language-provider";
 
 const SPECIAL_CHARS: Record<string, string[]> = {
+  tiv: ["ô", "û", "gh", "kp", "mb", "sh", "ts"],
   igl: ["ẹ", "ọ", "ñ", "ch", "gb", "kp", "kw", "gw", "́", "̀", "̄"],
-  yor: ["ẹ", "ọ", "ṣ", "́", "̀", "̄"],
+  yor: ["ẹ", "ọ", "ṣ", "gb", "́", "̀", "̄"],
+  hau: ["ɓ", "ɗ", "ƙ", "ƴ", "r̃"],
+  ibo: ["ị", "ọ", "ụ", "ṅ", "ch", "gb", "gh", "gw", "kp", "kw", "nw", "ny", "sh"],
 };
 
-// Standard endpoints
-const BACKEND_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
+type ItemDecision = {
+  decision: ReviewDecision;
+  comment: string;
+  suggested_correction?: string;
+};
 
-export function ReviewPortal({
-  initialSamples = MOCK_IGALA_SAMPLES,
-}: {
-  initialSamples?: ReviewSample[];
-}) {
+export function ReviewPortal() {
   const { activeLanguage } = useLanguage();
-  const datasetId = activeLanguage ? `${activeLanguage.code}-parallel-v1` : "";
-  const [samples, setSamples] = useState<ReviewSample[]>(initialSamples);
+  const mountedRef = useRef(true);
+
+  const [reviewRequests, setReviewRequests] = useState<ReviewRequestDto[]>([]);
+  const [selectedRequestId, setSelectedRequestId] = useState<string>("");
+  const [samples, setSamples] = useState<ReviewSampleItemDto[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [reviewerId, setReviewerId] = useState("olusegun-linguist");
-  const [decisions, setDecisions] = useState<
-    Record<string, ReviewItemDecision>
-  >({});
+  const [reviewerId, setReviewerId] = useState("");
+  const [decisions, setDecisions] = useState<Record<string, ItemDecision>>({});
+  const [isLoadingRequests, setIsLoadingRequests] = useState(true);
+  const [isLoadingSamples, setIsLoadingSamples] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedPayload, setSubmittedPayload] = useState<any | null>(null);
-  const [isConnectedToBackend, setIsConnectedToBackend] = useState<
-    boolean | null
-  >(null);
-  const [activeEndpointUrl, setActiveEndpointUrl] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
+  const [submittedPayload, setSubmittedPayload] = useState<BatchSubmitResponseDto | null>(null);
 
-  // Fetch real samples from James's FastAPI endpoint on mount
-  const fetchLiveSamples = useCallback(async () => {
-    const langCode = activeLanguage?.code;
-    if (!langCode) return;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const fetchRequests = useCallback(async () => {
+    setIsLoadingRequests(true);
+    setError(null);
     try {
-      // 1. Try James's FastAPI backend first
-      const fastApiUrl = `${BACKEND_BASE}/review/requests/rev_req_${langCode}_001/samples`;
-      setActiveEndpointUrl(fastApiUrl);
-      const res = await fetch(fastApiUrl, { cache: "no-store" });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.items && Array.isArray(data.items) && data.items.length > 0) {
-          const mapped: ReviewSample[] = data.items.map((it: any) => ({
-            sample_id: it.id || it.record_id,
-            source_text: it.input_text || it.source_text,
-            target_text: it.expected_text || it.target_text,
-            domain: it.context || "General / Community",
-            confidence_score: 0.95,
-          }));
-          setSamples(mapped);
-          setIsConnectedToBackend(true);
-          toast.success("Loaded real samples from James's backend endpoint!");
-          return;
-        }
+      const res = await foundryApi.listReviewRequests();
+      if (!mountedRef.current) return;
+      setReviewRequests(res.items);
+      if (res.items.length > 0) {
+        setSelectedRequestId(res.items[0].id);
+      } else {
+        setSelectedRequestId("");
+        setSamples([]);
       }
-    } catch {
-      // 2. Try Next.js internal API proxy
+    } catch (err: unknown) {
+      if (!mountedRef.current) return;
+      const message = axios.isAxiosError(err)
+        ? err.response?.data?.detail || err.message
+        : "Failed to connect to review queue endpoint.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      if (mountedRef.current) {
+        setIsLoadingRequests(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function initialLoad() {
       try {
-        const nextRes = await fetch("/api/review/samples");
-        if (nextRes.ok) {
-          const data = await nextRes.json();
-          if (
-            data.items &&
-            Array.isArray(data.items) &&
-            data.items.length > 0
-          ) {
-            const mapped: ReviewSample[] = data.items.map((it: any) => ({
-              sample_id: it.id || it.record_id,
-              source_text: it.input_text || it.source_text,
-              target_text: it.expected_text || it.target_text,
-              domain: it.context || "General / Community",
-              confidence_score: 0.95,
-            }));
-            setSamples(mapped);
-            setIsConnectedToBackend(true);
-            setActiveEndpointUrl("/api/review/samples");
-            return;
-          }
+        const res = await foundryApi.listReviewRequests();
+        if (!active) return;
+        setReviewRequests(res.items);
+        if (res.items.length > 0) {
+          setSelectedRequestId(res.items[0].id);
         }
-      } catch {
-        // Fallback to initial samples
+      } catch (err: unknown) {
+        if (!active) return;
+        const message = axios.isAxiosError(err)
+          ? err.response?.data?.detail || err.message
+          : "Failed to connect to review queue endpoint.";
+        setError(message);
+      } finally {
+        if (active) {
+          setIsLoadingRequests(false);
+        }
       }
     }
 
-    setIsConnectedToBackend(false);
-    setActiveEndpointUrl("local-cache");
-  }, [activeLanguage?.code]);
+    initialLoad();
 
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Load samples whenever the selected request changes
   useEffect(() => {
-    fetchLiveSamples();
-    // Reset state when language changes
-    setSamples([]);
-    setCurrentIndex(0);
-    setDecisions({});
-    setSubmittedPayload(null);
-  }, [fetchLiveSamples]);
+    if (!selectedRequestId) return;
 
+    let isCurrent = true;
+
+    async function loadSamples() {
+      setIsLoadingSamples(true);
+      setSubmittedPayload(null);
+      setDecisions({});
+      setCurrentIndex(0);
+
+      try {
+        const res = await foundryApi.getReviewSamples(selectedRequestId);
+        if (!isCurrent || !mountedRef.current) return;
+        setSamples(res.items);
+      } catch (err: unknown) {
+        if (!isCurrent || !mountedRef.current) return;
+        const message = axios.isAxiosError(err)
+          ? err.response?.data?.detail || err.message
+          : `Failed to load samples for request ${selectedRequestId}.`;
+        toast.error(message);
+        setSamples([]);
+      } finally {
+        if (isCurrent && mountedRef.current) {
+          setIsLoadingSamples(false);
+        }
+      }
+    }
+
+    loadSamples();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedRequestId]);
+
+  const currentRequest = reviewRequests.find((r) => r.id === selectedRequestId);
   const currentSample = samples[currentIndex];
-  const currentDecision = currentSample
-    ? decisions[currentSample.sample_id]
-    : undefined;
+  const currentDecision = currentSample ? decisions[currentSample.id] : undefined;
 
   // Calculate statistics
   const reviewedCount = Object.keys(decisions).length;
-  const approvedCount = Object.values(decisions).filter(
-    (d) => d.decision === "approved",
-  ).length;
-  const correctionCount = Object.values(decisions).filter(
-    (d) => d.decision === "needs_correction",
-  ).length;
-  const rejectedCount = Object.values(decisions).filter(
-    (d) => d.decision === "rejected",
-  ).length;
-  const progressPct = Math.round(
-    (reviewedCount / Math.max(1, samples.length)) * 100,
-  );
+  const correctCount = Object.values(decisions).filter((d) => d.decision === "correct").length;
+  const correctionCount = Object.values(decisions).filter((d) => d.decision === "needs_correction").length;
+  const incorrectCount = Object.values(decisions).filter((d) => d.decision === "incorrect").length;
+  const progressPct = samples.length > 0 ? Math.round((reviewedCount / samples.length) * 100) : 0;
 
-  const handleDecision = async (decision: ReviewDecision) => {
+  const handleDecision = (decision: ReviewDecision) => {
     if (!currentSample) return;
 
-    const newDecisionRecord: ReviewItemDecision = {
-      sample_id: currentSample.sample_id,
+    const newDecisionRecord: ItemDecision = {
       decision,
-      comment: decisions[currentSample.sample_id]?.comment || "",
+      comment: decisions[currentSample.id]?.comment || "",
       suggested_correction:
         decision === "needs_correction"
-          ? decisions[currentSample.sample_id]?.suggested_correction ||
-            currentSample.target_text
+          ? decisions[currentSample.id]?.suggested_correction || currentSample.expected_text
           : undefined,
     };
 
     setDecisions((prev) => ({
       ...prev,
-      [currentSample.sample_id]: newDecisionRecord,
+      [currentSample.id]: newDecisionRecord,
     }));
 
-    if (decision === "approved") {
-      toast.success(`Sample ${currentSample.sample_id} Approved`);
+    if (decision === "correct") {
+      toast.success(`Sample ${currentSample.id} marked correct`);
     } else if (decision === "needs_correction") {
-      toast.info(`Marked for Orthography Correction`);
+      toast.info(`Marked for orthography correction`);
     } else {
-      toast.error(`Sample ${currentSample.sample_id} Rejected`);
-    }
-
-    // Proactively sync decision to real backend endpoint
-    try {
-      await fetch(`${BACKEND_BASE}/review/decisions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          review_request_id: `rev_req_${activeLanguage?.code}_001`,
-          sample_item_id: currentSample.sample_id,
-          decision,
-          reviewer_id: reviewerId,
-          corrected_text: newDecisionRecord.suggested_correction,
-          notes: newDecisionRecord.comment,
-        }),
-      });
-    } catch {
-      // Ignored for live fluidity
+      toast.error(`Sample ${currentSample.id} marked incorrect`);
     }
   };
 
-  const updateDecisionDetails = (patch: Partial<ReviewItemDecision>) => {
+  const updateDecisionDetails = (patch: Partial<ItemDecision>) => {
     if (!currentSample) return;
     setDecisions((prev) => {
-      const existing = prev[currentSample.sample_id] || {
-        sample_id: currentSample.sample_id,
+      const existing = prev[currentSample.id] || {
         decision: "needs_correction",
         comment: "",
       };
       return {
         ...prev,
-        [currentSample.sample_id]: {
+        [currentSample.id]: {
           ...existing,
           ...patch,
         },
@@ -195,67 +202,72 @@ export function ReviewPortal({
 
   const insertDiacritic = (char: string) => {
     const currentCorrection =
-      currentDecision?.suggested_correction ?? currentSample?.target_text ?? "";
+      currentDecision?.suggested_correction ?? currentSample?.expected_text ?? "";
     updateDecisionDetails({
       suggested_correction: currentCorrection + char,
     });
   };
 
   const handleSubmitBatch = async () => {
+    if (!currentRequest) {
+      toast.error("No active review request selected.");
+      return;
+    }
+
+    if (!reviewerId.trim()) {
+      toast.warning("Please enter your Reviewer ID or name before submitting.");
+      return;
+    }
+
     if (reviewedCount === 0) {
-      toast.warning("Please review at least one sample before submitting.");
+      toast.warning("Please review at least one sample before submitting audit decisions.");
+      return;
+    }
+
+    if (isSubmitting) {
       return;
     }
 
     setIsSubmitting(true);
-    const payload: ReviewSubmissionPayload = {
-      dataset_id: datasetId,
-      reviewer_id: reviewerId,
-      decisions: Object.values(decisions),
-      submitted_at: new Date().toISOString(),
-    };
+    setError(null);
 
-    let serverResponse: any = null;
+    const payloadDecisions = Object.entries(decisions).map(([sampleId, d]) => ({
+      sample_id: sampleId,
+      sample_item_id: sampleId,
+      decision: d.decision,
+      suggested_correction: d.suggested_correction,
+      corrected_text: d.suggested_correction,
+      comment: d.comment,
+      notes: d.comment,
+    }));
 
     try {
-      // Call James's FastAPI endpoint
-      const res = await fetch(`${BACKEND_BASE}/review/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      const res = await foundryApi.submitReviewBatch({
+        dataset_id: currentRequest.dataset_id,
+        reviewer_id: reviewerId.trim(),
+        decisions: payloadDecisions,
+        submitted_at: new Date().toISOString(),
       });
 
-      if (res.ok) {
-        serverResponse = await res.json();
-      }
-    } catch {
-      // Try Next.js internal API
-      try {
-        const nextRes = await fetch("/api/review/submit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (nextRes.ok) {
-          serverResponse = await nextRes.json();
-        }
-      } catch {
-        // Offline
+      if (!mountedRef.current) return;
+      setSubmittedPayload(res);
+      toast.success(`Successfully recorded ${res.processed_decisions} audit decisions.`);
+    } catch (err: unknown) {
+      if (!mountedRef.current) return;
+      const message = axios.isAxiosError(err)
+        ? err.response?.data?.detail || err.message
+        : "Failed to submit review batch to backend.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      if (mountedRef.current) {
+        setIsSubmitting(false);
       }
     }
-
-    setIsSubmitting(false);
-    setSubmittedPayload(serverResponse || payload);
-    toast.success("Audit batch successfully posted to real endpoint!");
   };
 
-  if (!activeLanguage) {
-    return (
-      <div className="rounded-lg border border-border bg-surface p-5">
-        <p className="text-sm text-muted">Loading language…</p>
-      </div>
-    );
-  }
+  const activeSpecialChars =
+    SPECIAL_CHARS[activeLanguage.language_code] || SPECIAL_CHARS.tiv;
 
   return (
     <div className="space-y-6">
@@ -263,326 +275,411 @@ export function ReviewPortal({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2.5">
-            <h2 className="text-2xl font-semibold tracking-tight">
-              Human Linguistic Review
-            </h2>
-            {isConnectedToBackend === true ? (
+            <h2 className="text-2xl font-semibold tracking-tight">Human Linguistic Review</h2>
+            {isLoadingRequests ? (
+              <span className="text-xs text-muted">Loading queue…</span>
+            ) : reviewRequests.length > 0 ? (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live FastAPI Connected (:8000)
-              </span>
-            ) : isConnectedToBackend === false ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
-                Local Fallback Mode
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                Active Requests Available ({reviewRequests.length})
               </span>
             ) : (
-              <span className="text-xs text-muted">Checking connection...</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-[11px] font-medium text-muted">
+                Queue Empty
+              </span>
             )}
           </div>
           <p className="mt-1 text-sm text-muted">
-            Native speaker orthography audit and verification gate for{" "}
-            {activeLanguage.name} ({activeLanguage.code}).
+            Native speaker linguistic audit and verification gate for underserved Nigerian languages.
           </p>
         </div>
+
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted">Reviewer:</span>
+          <label htmlFor="reviewer-id-input" className="text-xs font-medium text-muted">
+            Reviewer ID:
+          </label>
           <input
+            id="reviewer-id-input"
             type="text"
             value={reviewerId}
             onChange={(e) => setReviewerId(e.target.value)}
-            className="rounded-md border border-border bg-surface px-3 py-1 text-xs font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-            placeholder="Reviewer ID"
+            className="rounded-md border border-border bg-surface px-3 py-1 text-xs font-semibold text-foreground placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+            placeholder="e.g. linguist-reviewer-1"
           />
         </div>
       </div>
 
-      {/* Audit Progress & Stats Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-            Progress
-          </p>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-semibold tabular-nums">
-              {reviewedCount}/{samples.length}
-            </span>
-            <span className="text-xs font-medium text-accent">
-              {progressPct}%
-            </span>
+      {/* Review Request Queue Selector */}
+      <section className="rounded-lg border border-border bg-surface p-5">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
+          Review Request Queue
+        </h3>
+
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="w-full sm:w-96">
+            {isLoadingRequests ? (
+              <div className="h-9 w-full animate-pulse rounded-md border border-border bg-surface-muted" />
+            ) : reviewRequests.length > 0 ? (
+              <Select
+                options={reviewRequests.map((r) => ({
+                  value: r.id,
+                  label: `${r.id} (${r.dataset_id} · ${r.status})`,
+                }))}
+                value={selectedRequestId}
+                onChange={(id) => {
+                  setSelectedRequestId(id);
+                }}
+                ariaLabel="Select review request"
+              />
+            ) : (
+              <Select
+                options={[{ value: "", label: "No review requests in queue" }]}
+                value=""
+                onChange={() => {}}
+                ariaLabel="No review requests in queue"
+              />
+            )}
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
-            <div
-              className="h-full bg-accent transition-all duration-300"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-        </div>
 
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-            Approved
-          </p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-            {approvedCount}
-          </p>
-          <p className="mt-1 text-xs text-muted">Passed Gate 2</p>
-        </div>
-
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-            Corrected
-          </p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">
-            {correctionCount}
-          </p>
-          <p className="mt-1 text-xs text-muted">Orthography adjusted</p>
-        </div>
-
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-            Rejected
-          </p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums text-red-600 dark:text-red-400">
-            {rejectedCount}
-          </p>
-          <p className="mt-1 text-xs text-muted">Excluded from training</p>
-        </div>
-      </div>
-
-      {/* Main Review Card */}
-      {currentSample && (
-        <section className="rounded-lg border border-border bg-surface p-5 sm:p-6">
-          {/* Card Header */}
-          <div className="flex flex-col gap-2 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <span className="rounded-md bg-accent-soft px-2.5 py-1 text-xs font-bold text-accent">
-                {currentSample.sample_id}
-              </span>
-              <span className="text-xs font-medium text-muted">
-                Domain: {currentSample.domain}
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-muted">
-                Confidence:{" "}
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                  {(currentSample.confidence_score * 100).toFixed(0)}%
+          <div className="flex flex-wrap items-center gap-2">
+            {currentRequest ? (
+              <>
+                <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent">
+                  Dataset: {currentRequest.dataset_id}
                 </span>
-              </span>
-              {currentDecision && (
-                <span
-                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    currentDecision.decision === "approved"
-                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                      : currentDecision.decision === "needs_correction"
+                <span className="inline-flex items-center rounded-full bg-surface-muted px-2.5 py-0.5 text-xs font-medium text-muted border border-border">
+                  Status: {currentRequest.status}
+                </span>
+                <span className="text-xs text-muted">
+                  Target Sample Size: {currentRequest.sample_size}
+                </span>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={fetchRequests}
+                className="text-xs text-accent hover:underline"
+              >
+                Refresh Queue
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Truthful Empty Queue State */}
+        {!isLoadingRequests && reviewRequests.length === 0 ? (
+          <div className="mt-4 space-y-3 rounded-md border border-border bg-surface-muted/40 p-4 text-xs text-muted leading-relaxed">
+            <p className="font-semibold text-foreground">
+              No human review requests exist in the Foundry queue.
+            </p>
+            <p>
+              In the N-ATLaS Language Foundry architecture, review requests are generated after
+              dataset ingestion and automated quality auditing identify candidate records for
+              native-speaker linguistic verification.
+            </p>
+            <div className="rounded border border-amber-500/20 bg-amber-500/10 p-3 text-amber-800 dark:text-amber-300">
+              <strong>Control-Plane Status &amp; Dataset Eligibility:</strong>
+              <ul className="mt-1.5 list-disc pl-4 space-y-1">
+                <li>
+                  Review schemas (<code>ReviewRequest</code>, <code>ReviewSampleItem</code>,{" "}
+                  <code>ReviewDecisionRecord</code>, <code>HumanReviewSummary</code>) are formally
+                  defined, but persistent sampling workers and database storage have not yet been deployed.
+                </li>
+                <li>
+                  The Tiv pilot dataset (<code>tiv-mt560-v1</code>) currently holds{" "}
+                  <strong>registered</strong> status. It will not be marked as reviewed or ready
+                  until human review protocols and provenance audits are formally conducted and recorded.
+                </li>
+              </ul>
+            </div>
+          </div>
+        ) : null}
+
+        {error ? (
+          <div className="mt-3 rounded border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-700 dark:text-red-300">
+            {error}
+          </div>
+        ) : null}
+      </section>
+
+      {/* Active Audit Section: Only shown when samples exist */}
+      {reviewRequests.length > 0 && samples.length > 0 && currentSample && (
+        <>
+          {/* Audit Progress & Stats Cards */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">Progress</p>
+              <div className="mt-2 flex items-baseline justify-between">
+                <span className="text-2xl font-semibold tabular-nums">
+                  {reviewedCount}/{samples.length}
+                </span>
+                <span className="text-xs font-medium text-accent">{progressPct}%</span>
+              </div>
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
+                <div
+                  className="h-full bg-accent transition-all duration-300"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">Correct</p>
+              <p className="mt-2 text-2xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                {correctCount}
+              </p>
+              <p className="mt-1 text-xs text-muted">Verified accurate</p>
+            </div>
+
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">Needs Correction</p>
+              <p className="mt-2 text-2xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+                {correctionCount}
+              </p>
+              <p className="mt-1 text-xs text-muted">Orthography adjusted</p>
+            </div>
+
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">Incorrect</p>
+              <p className="mt-2 text-2xl font-semibold tabular-nums text-red-600 dark:text-red-400">
+                {incorrectCount}
+              </p>
+              <p className="mt-1 text-xs text-muted">Marked for exclusion</p>
+            </div>
+          </div>
+
+          {/* Main Review Card */}
+          <section className="rounded-lg border border-border bg-surface p-5 sm:p-6">
+            {/* Card Header */}
+            <div className="flex flex-col gap-2 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="rounded-md bg-accent/10 px-2.5 py-1 text-xs font-bold text-accent">
+                  {currentSample.id}
+                </span>
+                {currentSample.context ? (
+                  <span className="text-xs font-medium text-muted">
+                    Context: {currentSample.context}
+                  </span>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-3">
+                {currentSample.flagged_reason ? (
+                  <span className="text-xs text-amber-600 dark:text-amber-400">
+                    Flagged: {currentSample.flagged_reason}
+                  </span>
+                ) : null}
+                {currentDecision && (
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      currentDecision.decision === "correct"
+                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                        : currentDecision.decision === "needs_correction"
                         ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
                         : "bg-red-500/15 text-red-700 dark:text-red-300"
-                  }`}
-                >
-                  {currentDecision.decision.replace("_", " ")}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Bilingual Comparison Panels */}
-          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="rounded-lg border border-border bg-surface-muted p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-                Source Prompt (English)
-              </p>
-              <p className="mt-2 text-base font-medium text-foreground">
-                {currentSample.source_text}
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-accent/30 bg-accent-soft p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-accent">
-                Target Translation ({activeLanguage.name})
-              </p>
-              <p className="mt-2 text-base font-semibold text-foreground">
-                {currentSample.target_text}
-              </p>
-            </div>
-          </div>
-
-          {/* Decision Buttons */}
-          <div className="mt-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Linguistic Decision
-            </p>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <button
-                type="button"
-                onClick={() => handleDecision("approved")}
-                className={`inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
-                  currentDecision?.decision === "approved"
-                    ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
-                    : "border-border bg-surface text-foreground hover:bg-surface-muted hover:border-emerald-500/40"
-                }`}
-              >
-                <CheckIcon className="h-4 w-4" />
-                Approve (Accurate)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDecision("needs_correction")}
-                className={`inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
-                  currentDecision?.decision === "needs_correction"
-                    ? "border-amber-500 bg-amber-500 text-white shadow-sm"
-                    : "border-border bg-surface text-foreground hover:bg-surface-muted hover:border-amber-500/40"
-                }`}
-              >
-                Correct Orthography
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDecision("rejected")}
-                className={`inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
-                  currentDecision?.decision === "rejected"
-                    ? "border-red-600 bg-red-600 text-white shadow-sm"
-                    : "border-border bg-surface text-foreground hover:bg-surface-muted hover:border-red-500/40"
-                }`}
-              >
-                <XIcon className="h-4 w-4" />
-                Reject Sample
-              </button>
-            </div>
-          </div>
-
-          {/* Diacritics Keyboard Bar & Correction Area */}
-          {currentDecision?.decision === "needs_correction" && (
-            <div className="mt-5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                  {activeLanguage.name} Orthography & Tone Diacritics Toolbar
-                </p>
-                <span className="text-xs text-muted">
-                  Click diacritic to insert
-                </span>
-              </div>
-
-              <div className="mt-2.5 flex flex-wrap gap-1.5">
-                {(SPECIAL_CHARS[activeLanguage.code] || []).map((char) => (
-                  <button
-                    key={char}
-                    type="button"
-                    onClick={() => insertDiacritic(char)}
-                    className="inline-flex h-8 min-w-8 items-center justify-center rounded border border-border bg-surface px-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent-soft hover:border-accent"
-                  >
-                    {char}
-                  </button>
-                ))}
-              </div>
-
-              <input
-                type="text"
-                value={currentDecision.suggested_correction || ""}
-                onChange={(e) =>
-                  updateDecisionDetails({
-                    suggested_correction: e.target.value,
-                  })
-                }
-                placeholder={`Corrected ${activeLanguage.name} sentence with tones...`}
-                className="mt-3 w-full rounded-md border border-border bg-surface p-2.5 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-              />
-            </div>
-          )}
-
-          {/* Linguistic Notes */}
-          <div className="mt-5">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted">
-              Linguistic Notes / Justification
-            </label>
-            <input
-              type="text"
-              value={currentDecision?.comment || ""}
-              onChange={(e) =>
-                updateDecisionDetails({ comment: e.target.value })
-              }
-              placeholder="e.g. Tone diacritic mark on 'ọ' adjusted; natural native phrasing."
-              className="mt-2 w-full rounded-md border border-border bg-surface p-2.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-            />
-          </div>
-
-          {/* Card Navigation Footer */}
-          <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
-            <button
-              type="button"
-              disabled={currentIndex === 0}
-              onClick={() => setCurrentIndex((p) => Math.max(0, p - 1))}
-              className="inline-flex items-center rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              ‹ Previous
-            </button>
-
-            {/* Jump Pills */}
-            <div className="flex gap-1.5 overflow-x-auto py-1">
-              {samples.map((s, idx) => {
-                const dec = decisions[s.sample_id]?.decision;
-                return (
-                  <button
-                    key={s.sample_id}
-                    type="button"
-                    onClick={() => setCurrentIndex(idx)}
-                    className={`h-7 w-7 rounded-full text-xs font-semibold transition-all ${
-                      idx === currentIndex
-                        ? "ring-2 ring-accent ring-offset-2 ring-offset-background"
-                        : ""
-                    } ${
-                      dec === "approved"
-                        ? "bg-emerald-600 text-white"
-                        : dec === "needs_correction"
-                          ? "bg-amber-500 text-white"
-                          : dec === "rejected"
-                            ? "bg-red-600 text-white"
-                            : "bg-surface-muted text-muted hover:bg-border"
                     }`}
                   >
-                    {idx + 1}
-                  </button>
-                );
-              })}
+                    {currentDecision.decision.replace("_", " ")}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Bilingual Comparison Panels */}
+            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="rounded-lg border border-border bg-surface-muted p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+                  Input Text
+                </p>
+                <p className="mt-2 text-base font-medium text-foreground">
+                  {currentSample.input_text}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-accent/30 bg-accent/5 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-accent">
+                  Target Translation
+                </p>
+                <p className="mt-2 text-base font-semibold text-foreground">
+                  {currentSample.expected_text}
+                </p>
+              </div>
+            </div>
+
+            {/* Decision Buttons */}
+            <div className="mt-6">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+                Linguistic Decision
+              </p>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => handleDecision("correct")}
+                  className={`inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    currentDecision?.decision === "correct"
+                      ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                      : "border-border bg-surface text-foreground hover:bg-surface-muted hover:border-emerald-500/40"
+                  }`}
+                >
+                  <CheckIcon className="h-4 w-4" />
+                  Mark Correct (Accurate)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDecision("needs_correction")}
+                  className={`inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    currentDecision?.decision === "needs_correction"
+                      ? "border-amber-500 bg-amber-500 text-white shadow-sm"
+                      : "border-border bg-surface text-foreground hover:bg-surface-muted hover:border-amber-500/40"
+                  }`}
+                >
+                  Needs Correction
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDecision("incorrect")}
+                  className={`inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    currentDecision?.decision === "incorrect"
+                      ? "border-red-600 bg-red-600 text-white shadow-sm"
+                      : "border-border bg-surface text-foreground hover:bg-surface-muted hover:border-red-500/40"
+                  }`}
+                >
+                  <XIcon className="h-4 w-4" />
+                  Mark Incorrect (Exclude)
+                </button>
+              </div>
+            </div>
+
+            {/* Diacritics Keyboard Bar & Correction Area */}
+            {currentDecision?.decision === "needs_correction" && (
+              <div className="mt-5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                    Orthography &amp; Tone Diacritics Toolbar
+                  </p>
+                  <span className="text-xs text-muted">Click diacritic to insert</span>
+                </div>
+
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {activeSpecialChars.map((char) => (
+                    <button
+                      key={char}
+                      type="button"
+                      onClick={() => insertDiacritic(char)}
+                      className="inline-flex h-8 min-w-8 items-center justify-center rounded border border-border bg-surface px-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent/10 hover:border-accent"
+                    >
+                      {char}
+                    </button>
+                  ))}
+                </div>
+
+                <input
+                  type="text"
+                  value={currentDecision.suggested_correction || ""}
+                  onChange={(e) =>
+                    updateDecisionDetails({ suggested_correction: e.target.value })
+                  }
+                  placeholder="Corrected translation with tones…"
+                  className="mt-3 w-full rounded-md border border-border bg-surface p-2.5 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                />
+              </div>
+            )}
+
+            {/* Linguistic Notes */}
+            <div className="mt-5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-muted">
+                Linguistic Notes / Justification
+              </label>
+              <input
+                type="text"
+                value={currentDecision?.comment || ""}
+                onChange={(e) => updateDecisionDetails({ comment: e.target.value })}
+                placeholder="e.g. Tone diacritic mark adjusted; natural native phrasing."
+                className="mt-2 w-full rounded-md border border-border bg-surface p-2.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+              />
+            </div>
+
+            {/* Card Navigation Footer */}
+            <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
+              <button
+                type="button"
+                disabled={currentIndex === 0}
+                onClick={() => setCurrentIndex((p) => Math.max(0, p - 1))}
+                className="inline-flex items-center rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                ‹ Previous
+              </button>
+
+              {/* Jump Pills */}
+              <div className="flex gap-1.5 overflow-x-auto py-1">
+                {samples.map((s, idx) => {
+                  const dec = decisions[s.id]?.decision;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setCurrentIndex(idx)}
+                      className={`h-7 w-7 rounded-full text-xs font-semibold transition-all ${
+                        idx === currentIndex
+                          ? "ring-2 ring-accent ring-offset-2 ring-offset-background"
+                          : ""
+                      } ${
+                        dec === "correct"
+                          ? "bg-emerald-600 text-white"
+                          : dec === "needs_correction"
+                          ? "bg-amber-500 text-white"
+                          : dec === "incorrect"
+                          ? "bg-red-600 text-white"
+                          : "bg-surface-muted text-muted hover:bg-border"
+                      }`}
+                    >
+                      {idx + 1}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                disabled={currentIndex === samples.length - 1}
+                onClick={() => setCurrentIndex((p) => Math.min(samples.length - 1, p + 1))}
+                className="inline-flex items-center rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next ›
+              </button>
+            </div>
+          </section>
+
+          {/* Batch Submit Action Banner */}
+          <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Batch Status: {correctCount} Correct · {correctionCount} Corrected · {incorrectCount} Incorrect
+              </p>
+              <p className="mt-0.5 text-xs text-muted">
+                Target Dataset: {currentRequest?.dataset_id}
+              </p>
             </div>
 
             <button
               type="button"
-              disabled={currentIndex === samples.length - 1}
-              onClick={() =>
-                setCurrentIndex((p) => Math.min(samples.length - 1, p + 1))
-              }
-              className="inline-flex items-center rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={reviewedCount === 0 || isSubmitting}
+              onClick={handleSubmitBatch}
+              className="inline-flex items-center justify-center rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Next ›
+              {isSubmitting ? "Submitting to Backend…" : "Submit Audit Batch"}
             </button>
-          </div>
-        </section>
+          </section>
+        </>
       )}
 
-      {/* Batch Submit Action Banner */}
-      <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-foreground">
-            Batch Status: {approvedCount} Approved · {correctionCount} Corrected
-            · {rejectedCount} Rejected
-          </p>
-          <p className="mt-0.5 text-xs text-muted">
-            Target Endpoint:{" "}
-            {activeEndpointUrl || `${BACKEND_BASE}/review/submit`}
-          </p>
+      {/* When request has 0 samples */}
+      {reviewRequests.length > 0 && !isLoadingSamples && samples.length === 0 && (
+        <div className="rounded-lg border border-border bg-surface p-6 text-center text-sm text-muted">
+          No sample records are associated with review request &ldquo;{selectedRequestId}&rdquo;.
         </div>
-
-        <button
-          type="button"
-          disabled={reviewedCount === 0 || isSubmitting}
-          onClick={handleSubmitBatch}
-          className="inline-flex items-center justify-center rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isSubmitting ? "Submitting to Backend..." : "Submit Audit Batch"}
-        </button>
-      </section>
+      )}
 
       {/* Submission Success Confirmation */}
       {submittedPayload && (
@@ -594,13 +691,11 @@ export function ReviewPortal({
                 Review Batch Successfully Recorded in Backend
               </p>
             </div>
-            <span className="text-xs text-muted">
-              {submittedPayload.timestamp || submittedPayload.submitted_at}
-            </span>
+            <span className="text-xs text-muted">{submittedPayload.timestamp}</span>
           </div>
           <p className="mt-2 text-xs text-muted">
-            Audited payload confirming to Section 3.4 / Section 6 of API
-            contract.
+            {submittedPayload.message} (Dataset: {submittedPayload.dataset_id}, Reviewer:{" "}
+            {submittedPayload.reviewer_id})
           </p>
           <pre className="mt-3 overflow-x-auto rounded-md border border-border bg-surface p-3 font-mono text-xs text-foreground">
             {JSON.stringify(submittedPayload, null, 2)}

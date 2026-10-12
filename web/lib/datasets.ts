@@ -1,32 +1,21 @@
-export type DatasetFormat =
-  | "jsonl"
-  | "json"
-  | "csv"
-  | "tsv"
-  | "parquet"
-  | "txt";
+/**
+ * MIGRATION NOTE (Checkpoint 3):
+ * The datasets list and detail UI have been migrated to the real Foundry API
+ * via `foundryApi.listDatasets()` and `foundryApi.getDataset(id)` in `@/lib/api-client`.
+ *
+ * This mock file is retained for reference or any future mock consumers,
+ * but should not be used by dataset UI routes.
+ */
 
-export type DatasetSourceType =
-  | "research"
-  | "community"
-  | "institutional"
-  | "private";
+export type DatasetQualityStatus = "passed" | "needs_review" | "failed";
 
-export type DatasetStatus =
-  | "registered"
-  | "provenance_checked"
-  | "audited"
-  | "reviewed"
-  | "ready"
-  | "rejected";
 
-export const datasetStatusLabels: Record<DatasetStatus, string> = {
-  registered: "Registered",
-  provenance_checked: "Provenance checked",
-  audited: "Audited",
-  reviewed: "Reviewed",
-  ready: "Ready",
-  rejected: "Rejected",
+export type DatasetQuality = {
+  missing_values: number;
+  empty_records: number;
+  duplicates: number;
+  malformed_rows: number;
+  possible_non_language: number;
 };
 
 export type DatasetProvenance = {

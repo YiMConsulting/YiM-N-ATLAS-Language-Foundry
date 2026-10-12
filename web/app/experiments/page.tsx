@@ -1,15 +1,29 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { ExperimentsList } from "@/components/experiments/experiments-list";
-import { Skeleton } from "@/components/ui/skeleton";
-import { getExperiments } from "@/lib/api/experiments";
+import { foundryApi, type ExperimentDto } from "@/lib/api-client";
 
 export const metadata: Metadata = {
   title: "Experiments | N-ATLAS Language Foundry",
-  description: "Adaptation experiment records.",
+  description: "Record of adaptation runs in the Foundry.",
 };
 
-export default function ExperimentsPage() {
+export const instant = false;
+
+export default async function ExperimentsPage() {
+  let experiments: ExperimentDto[] = [];
+  let error: string | null = null;
+
+  try {
+    const res = await foundryApi.listExperiments();
+    experiments = res.items;
+  } catch (err: unknown) {
+    error =
+      err instanceof Error
+        ? err.message
+        : "Failed to connect to Foundry API.";
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -19,9 +33,13 @@ export default function ExperimentsPage() {
         </p>
       </div>
 
-      <Suspense fallback={<Skeleton className="h-40" />}>
-        <ExperimentsSection />
-      </Suspense>
+      {error ? (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-600 dark:text-red-400">
+          Failed to load experiments: {error}
+        </div>
+      ) : (
+        <ExperimentsList experiments={experiments} />
+      )}
     </div>
   );
 }

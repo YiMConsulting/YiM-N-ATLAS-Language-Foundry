@@ -6,7 +6,10 @@ export const metadata: Metadata = {
   description: "Compare base N-ATLAS with the adapted model side by side.",
 };
 
+export const instant = false;
+
 export default function PlaygroundPage() {
+
   return (
     <div className="space-y-6">
       <div>

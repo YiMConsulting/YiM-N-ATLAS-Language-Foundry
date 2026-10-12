@@ -1,74 +1,51 @@
 import type { ReactNode } from "react";
-import { CheckIcon, XIcon } from "@/components/icons";
-import type { DatasetProvenance } from "@/lib/datasets";
+import type { DatasetDto } from "@/lib/api-client";
 
-export function ProvenanceCard({
-  provenance,
-}: {
-  provenance: DatasetProvenance | null;
-}) {
-  if (!provenance) {
-    return (
-      <section className="rounded-lg border border-border bg-surface p-5">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
-          Provenance
-        </h3>
-        <p className="mt-4 text-sm text-muted">
-          Provenance not available — waiting on the backend provenance route.
-        </p>
-      </section>
-    );
-  }
+export function ProvenanceCard({ dataset }: { dataset: DatasetDto }) {
+  const isProvenanceChecked = dataset.status === "provenance_checked" || dataset.status === "ready";
 
   return (
     <section className="rounded-lg border border-border bg-surface p-5">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
-        Provenance
-      </h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
+          Provenance & Licensing
+        </h3>
+        <span className="font-mono text-xs text-muted">
+          {dataset.provenance_id}
+        </span>
+      </div>
 
       <dl className="mt-4 space-y-3">
-        <Row label="Source" value={provenance.source_name} />
-        {provenance.source_url ? (
-          <Row
-            label="Source URL"
-            value={
-              <a
-                href={provenance.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-accent hover:underline"
-              >
-                {provenance.source_url}
-              </a>
-            }
-          />
-        ) : null}
-        <Row label="License" value={provenance.license} />
-        <Row label="Version" value={provenance.version ?? "—"} />
-        {provenance.checksum ? (
-          <Row
-            label="Checksum"
-            value={<code className="text-sm">{provenance.checksum}</code>}
-          />
-        ) : null}
-        <Row label="Retrieved" value={provenance.retrieved_at} />
+        <Row label="Provenance ID" value={<span className="font-mono">{dataset.provenance_id}</span>} />
+        <Row label="Source type" value={<span className="capitalize">{dataset.source_type}</span>} />
+        <Row label="Format" value={<span className="font-mono uppercase">{dataset.format}</span>} />
+        <Row
+          label="Version / Commit"
+          value={
+            dataset.version ? (
+              <code className="text-xs">{dataset.version.slice(0, 12)}</code>
+            ) : (
+              <span className="text-muted italic">Unavailable</span>
+            )
+          }
+        />
+        <Row
+          label="License"
+          value={
+            <span className="text-amber-600 dark:text-amber-400">
+              Pending verification
+            </span>
+          }
+        />
       </dl>
 
-      {provenance.usage_allowed ? (
-        <div className="mt-5 flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
-          <CheckIcon className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-300" />
-          <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-            Intended use allowed
-          </span>
-        </div>
-      ) : (
-        <div className="mt-5 flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3">
-          <XIcon className="h-5 w-5 shrink-0 text-red-600 dark:text-red-300" />
-          <span className="text-sm font-semibold text-red-700 dark:text-red-300">
-            Review required before use
-          </span>
-        </div>
-      )}
+      <div className="mt-5 flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-300">
+        <span>
+          {isProvenanceChecked
+            ? "Provenance has been verified by the Foundry."
+            : "Provenance record exists, but license and usage rights are awaiting audit verification."}
+        </span>
+      </div>
     </section>
   );
 }
