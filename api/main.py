@@ -33,102 +33,74 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory store initialized with Igala baseline data
+# In-memory store initialized with verified Tiv pilot and discovered baseline data
 NOW = datetime.now(timezone.utc)
 
 LANGUAGES: dict[str, dict[str, Any]] = {
+    "tiv": {
+        "id": "lang-tiv-001",
+        "code": "tiv",
+        "name": "Tiv",
+        "status": "data_available",
+        "description": "Primary pilot language with verified English-Tiv parallel corpus and splits.",
+        "created_at": NOW.isoformat(),
+        "updated_at": NOW.isoformat(),
+    },
     "igl": {
-        "id": "lang-igl-001",
+        "id": "lang-igl-002",
         "code": "igl",
         "name": "Igala",
-        "native_name": "Ígálá",
-        "status": "active",
-        "description": "Primary low-resource benchmark language for the Foundry pipeline.",
-        "created_at": NOW.isoformat(),
-        "updated_at": NOW.isoformat(),
-    },
-    "ha": {
-        "id": "lang-ha-002",
-        "code": "ha",
-        "name": "Hausa",
-        "native_name": "Hausa",
-        "status": "active",
-        "description": "High-resource Nigerian benchmark language in N-ATLaS base.",
-        "created_at": NOW.isoformat(),
-        "updated_at": NOW.isoformat(),
-    },
-    "yo": {
-        "id": "lang-yo-003",
-        "code": "yo",
-        "name": "Yoruba",
-        "native_name": "Yorùbá",
-        "status": "active",
-        "description": "High-resource Nigerian benchmark language active for multi-adapter cross-evaluation.",
+        "status": "discovered",
+        "description": "Exploratory Nigerian language under provenance and corpus investigation.",
         "created_at": NOW.isoformat(),
         "updated_at": NOW.isoformat(),
     },
     "yor": {
-        "id": "lang-yo-003",
+        "id": "lang-yor-003",
         "code": "yor",
         "name": "Yoruba",
-        "native_name": "Yorùbá",
-        "status": "active",
-        "description": "High-resource Nigerian benchmark language active for multi-adapter cross-evaluation.",
+        "status": "discovered",
+        "description": "Benchmark Nigerian language supported in base N-ATLaS model.",
+        "created_at": NOW.isoformat(),
+        "updated_at": NOW.isoformat(),
+    },
+    "ha": {
+        "id": "lang-ha-004",
+        "code": "ha",
+        "name": "Hausa",
+        "status": "discovered",
+        "description": "Benchmark Nigerian language supported in base N-ATLaS model.",
         "created_at": NOW.isoformat(),
         "updated_at": NOW.isoformat(),
     },
     "ibo": {
-        "id": "lang-ibo-004",
+        "id": "lang-ibo-005",
         "code": "ibo",
         "name": "Igbo",
-        "native_name": "Asụsụ Igbo",
-        "status": "active",
-        "description": "High-resource Nigerian benchmark language in N-ATLaS base.",
+        "status": "discovered",
+        "description": "Benchmark Nigerian language supported in base N-ATLaS model.",
         "created_at": NOW.isoformat(),
         "updated_at": NOW.isoformat(),
     },
 }
 
 DATASETS: dict[str, dict[str, Any]] = {
-    "igl-parallel-v1": {
-        "id": "igl-parallel-v1",
-        "language_code": "igl",
-        "name": "Igala Parallel Instructions V1",
-        "description": "Bilingual instruction tuning pairs audited with native speaker oversight.",
+    "tiv-mt560-v1": {
+        "id": "tiv-mt560-v1",
+        "language_code": "tiv",
+        "name": "Tiv MT560 Parallel Corpus V1",
+        "description": "English-Tiv sentence pairs from MT560 with deterministic grouped splitting.",
         "format": "jsonl",
-        "source_type": "community",
-        "record_count": 4850,
-        "provenance_id": "prov-igl-001",
-        "version": "v1.0",
-        "status": "ready",
-        "created_at": NOW.isoformat(),
-        "updated_at": NOW.isoformat(),
-    },
-    "yor-parallel-v1": {
-        "id": "yor-parallel-v1",
-        "language_code": "yor",
-        "name": "Yoruba Audited Instruction Corpus V1",
-        "description": "Bilingual Yoruba instruction dataset from Masakhane & native linguists.",
-        "format": "jsonl",
-        "source_type": "community",
-        "record_count": 15200,
-        "provenance_id": "prov-yor-001",
-        "version": "v1.0",
-        "status": "ready",
-        "created_at": NOW.isoformat(),
-        "updated_at": NOW.isoformat(),
-    },
-    "igl-monolingual-curated": {
-        "id": "igl-monolingual-curated",
-        "language_code": "igl",
-        "name": "Igala Monolingual Domain Corpus",
-        "description": "Verified oral and written Igala corpus for vocabulary adaptation.",
-        "format": "txt",
         "source_type": "research",
-        "record_count": 12400,
-        "provenance_id": "prov-igl-002",
-        "version": "v1.0",
-        "status": "ready",
+        "record_count": 184099,
+        "train_records": 138074,
+        "validation_records": 18410,
+        "test_records": 27615,
+        "split_id": "tiv-mt560-v1-split-42",
+        "provenance_id": "prov-tiv-mt560",
+        "version": "252074f0d4c82c0005099b5eb4043fddc43026f1",
+        "status": "registered",
+        "local_path": "data/processed/tiv-mt560-v1",
         "created_at": NOW.isoformat(),
         "updated_at": NOW.isoformat(),
     },
@@ -427,157 +399,41 @@ def get_review_summary(request_id: str):
 
 
 # --- Experiments ---
+EXPERIMENTS: dict[str, dict[str, Any]] = {}
+
 @app.get("/experiments")
 @app.get("/api/v1/experiments")
 def list_experiments():
+    items = list(EXPERIMENTS.values())
     return {
-        "items": [
-            {
-                "id": "exp-igl-lora-v1",
-                "language_code": "igl",
-                "base_model": "NCAIR1/N-ATLaS",
-                "dataset_ids": ["igl-parallel-v1"],
-                "split_id": "split-igl-80-10-10",
-                "status": "completed",
-                "adaptation": {
-                    "method": "lora",
-                    "rank": 16,
-                    "alpha": 32,
-                    "dropout": 0.05,
-                    "target_modules": ["q_proj", "v_proj"],
-                },
-                "training": {
-                    "per_device_batch_size": 4,
-                    "gradient_accumulation_steps": 4,
-                    "learning_rate": 0.0002,
-                    "epochs": 3,
-                    "warmup_ratio": 0.05,
-                    "weight_decay": 0.01,
-                    "seed": 42,
-                },
-                "runtime": {
-                    "hardware": "Dual Tesla T4 (2x15GB)",
-                    "device": "cuda",
-                    "precision": "bf16",
-                },
-                "base_results": {
-                    "loss": 2.84,
-                    "bleu_score": 14.2,
-                    "chrf_score": 38.6,
-                    "exact_match_ratio": 0.04,
-                    "inference_latency_ms": 280.0,
-                    "sanity_check_passed": True,
-                    "sample_outputs": [],
-                },
-                "adapted_results": {
-                    "loss": 1.42,
-                    "bleu_score": 28.7,
-                    "chrf_score": 59.4,
-                    "exact_match_ratio": 0.18,
-                    "inference_latency_ms": 295.0,
-                    "sanity_check_passed": True,
-                    "sample_outputs": [],
-                },
-                "artifacts": {
-                    "adapter_path": "experiments/igala-v1/adapter",
-                    "config_path": "experiments/igala-v1/adapter_config.json",
-                    "metrics_path": "experiments/igala-v1/metrics.json",
-                },
-            },
-            {
-                "id": "exp-yor-lora-v1",
-                "language_code": "yor",
-                "base_model": "NCAIR1/N-ATLaS",
-                "dataset_ids": ["yor-parallel-v1"],
-                "split_id": "split-yor-80-10-10",
-                "status": "completed",
-                "adaptation": {
-                    "method": "lora",
-                    "rank": 16,
-                    "alpha": 32,
-                    "dropout": 0.05,
-                    "target_modules": ["q_proj", "v_proj"],
-                },
-                "training": {
-                    "per_device_batch_size": 4,
-                    "gradient_accumulation_steps": 4,
-                    "learning_rate": 0.0002,
-                    "epochs": 3,
-                    "warmup_ratio": 0.05,
-                    "weight_decay": 0.01,
-                    "seed": 42,
-                },
-                "runtime": {
-                    "hardware": "Dual Tesla T4 (2x15GB)",
-                    "device": "cuda",
-                    "precision": "bf16",
-                },
-                "base_results": {
-                    "loss": 2.45,
-                    "bleu_score": 16.8,
-                    "chrf_score": 41.2,
-                    "exact_match_ratio": 0.08,
-                    "inference_latency_ms": 275.0,
-                    "sanity_check_passed": True,
-                    "sample_outputs": [],
-                },
-                "adapted_results": {
-                    "loss": 1.18,
-                    "bleu_score": 35.8,
-                    "chrf_score": 64.2,
-                    "exact_match_ratio": 0.24,
-                    "inference_latency_ms": 288.0,
-                    "sanity_check_passed": True,
-                    "sample_outputs": [],
-                },
-                "artifacts": {
-                    "adapter_path": "experiments/yoruba-v1/adapter",
-                    "config_path": "experiments/yoruba-v1/adapter/adapter_config.json",
-                    "metrics_path": "experiments/yoruba-v1/metrics.json",
-                },
-            }
-        ],
-        "total": 2,
+        "items": items,
+        "total": len(items),
     }
 
 @app.get("/experiments/{exp_id}")
 @app.get("/api/v1/experiments/{exp_id}")
 def get_experiment(exp_id: str):
-    exps = list_experiments()["items"]
-    for e in exps:
-        if e["id"] == exp_id:
-            return e
-    return exps[0]
+    exp = EXPERIMENTS.get(exp_id)
+    if not exp:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Experiment '{exp_id}' not found",
+        )
+    return exp
 
 
 # --- Playground Generation ---
 class PlaygroundRequest(BaseModel):
     prompt: str
-    language_code: Optional[str] = "igl"
-    experiment_id: Optional[str] = "exp-igl-lora-v1"
+    language_code: Optional[str] = "tiv"
+    experiment_id: Optional[str] = None
     max_new_tokens: Optional[int] = 64
     do_sample: Optional[bool] = False
 
 @app.post("/playground/generate")
 @app.post("/api/v1/playground/generate")
 def playground_generate(req: PlaygroundRequest):
-    is_yor = (req.language_code == "yor") or ("yor" in (req.experiment_id or ""))
-    if is_yor:
-        return {
-            "prompt": req.prompt,
-            "language_code": "yor",
-            "experiment_id": req.experiment_id or "exp-yor-lora-v1",
-            "base_output": f"[N-ATLaS Base]: E kaabo / flat unaccented Yoruba approximation for '{req.prompt}'.",
-            "adapted_output": f"[N-ATLaS + Yoruba LoRA]: Ẹ kárọ̀ o / Àlàáfíà — accurate Yoruba translation with full diacritics.",
-            "latency_ms": 235.0,
-            "status": "success",
-        }
-    return {
-        "prompt": req.prompt,
-        "language_code": req.language_code,
-        "experiment_id": req.experiment_id,
-        "base_output": f"[N-ATLaS Base]: Translation approximation for '{req.prompt}' without fine-tuning tone diacritics.",
-        "adapted_output": f"[N-ATLaS + LoRA]: Ómi kpaí alẹ́wa — accurate Igala generation with full tone markings.",
-        "latency_ms": 242.5,
-        "status": "success",
-    }
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Model inference is currently unavailable. Real inference endpoints are pending model hosting and adapter deployment.",
+    )
