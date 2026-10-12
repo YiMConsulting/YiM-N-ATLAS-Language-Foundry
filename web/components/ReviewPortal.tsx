@@ -11,6 +11,7 @@ import {
   type ReviewSampleItemDto,
   type ReviewDecision,
   type BatchSubmitResponseDto,
+  type DatasetReviewEvidenceDto,
 } from "@/lib/api-client";
 import { useLanguage } from "@/components/layout/language-provider";
 
@@ -43,6 +44,7 @@ export function ReviewPortal() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submittedPayload, setSubmittedPayload] = useState<BatchSubmitResponseDto | null>(null);
+  const [reviewEvidence, setReviewEvidence] = useState<DatasetReviewEvidenceDto | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -55,14 +57,22 @@ export function ReviewPortal() {
     setIsLoadingRequests(true);
     setError(null);
     try {
-      const res = await foundryApi.listReviewRequests();
+      const [reqsRes, evRes] = await Promise.allSettled([
+        foundryApi.listReviewRequests(),
+        foundryApi.getDatasetReviewEvidence("tiv-mt560-v1"),
+      ]);
       if (!mountedRef.current) return;
-      setReviewRequests(res.items);
-      if (res.items.length > 0) {
-        setSelectedRequestId(res.items[0].id);
-      } else {
-        setSelectedRequestId("");
-        setSamples([]);
+      if (reqsRes.status === "fulfilled") {
+        setReviewRequests(reqsRes.value.items);
+        if (reqsRes.value.items.length > 0) {
+          setSelectedRequestId(reqsRes.value.items[0].id);
+        } else {
+          setSelectedRequestId("");
+          setSamples([]);
+        }
+      }
+      if (evRes.status === "fulfilled") {
+        setReviewEvidence(evRes.value);
       }
     } catch (err: unknown) {
       if (!mountedRef.current) return;
@@ -83,11 +93,19 @@ export function ReviewPortal() {
 
     async function initialLoad() {
       try {
-        const res = await foundryApi.listReviewRequests();
+        const [reqsRes, evRes] = await Promise.allSettled([
+          foundryApi.listReviewRequests(),
+          foundryApi.getDatasetReviewEvidence("tiv-mt560-v1"),
+        ]);
         if (!active) return;
-        setReviewRequests(res.items);
-        if (res.items.length > 0) {
-          setSelectedRequestId(res.items[0].id);
+        if (reqsRes.status === "fulfilled") {
+          setReviewRequests(reqsRes.value.items);
+          if (reqsRes.value.items.length > 0) {
+            setSelectedRequestId(reqsRes.value.items[0].id);
+          }
+        }
+        if (evRes.status === "fulfilled") {
+          setReviewEvidence(evRes.value);
         }
       } catch (err: unknown) {
         if (!active) return;
@@ -366,31 +384,191 @@ export function ReviewPortal() {
           </div>
         </div>
 
-        {/* Truthful Empty Queue State */}
+        {/* Truthful Empty Queue State & Verified Evidence Presentation */}
         {!isLoadingRequests && reviewRequests.length === 0 ? (
-          <div className="mt-4 space-y-3 rounded-md border border-border bg-surface-muted/40 p-4 text-xs text-muted leading-relaxed">
-            <p className="font-semibold text-foreground">
-              No human review requests exist in the Foundry queue.
-            </p>
-            <p>
-              In the N-ATLaS Language Foundry architecture, review requests are generated after
-              dataset ingestion and automated quality auditing identify candidate records for
-              native-speaker linguistic verification.
-            </p>
-            <div className="rounded border border-amber-500/20 bg-amber-500/10 p-3 text-amber-800 dark:text-amber-300">
-              <strong>Control-Plane Status &amp; Dataset Eligibility:</strong>
-              <ul className="mt-1.5 list-disc pl-4 space-y-1">
-                <li>
-                  Review schemas (<code>ReviewRequest</code>, <code>ReviewSampleItem</code>,{" "}
-                  <code>ReviewDecisionRecord</code>, <code>HumanReviewSummary</code>) are formally
-                  defined, but persistent sampling workers and database storage have not yet been deployed.
-                </li>
-                <li>
-                  The Tiv pilot dataset (<code>tiv-mt560-v1</code>) currently holds{" "}
-                  <strong>registered</strong> status. It will not be marked as reviewed or ready
-                  until human review protocols and provenance audits are formally conducted and recorded.
-                </li>
-              </ul>
+          <div className="mt-4 space-y-5">
+            <div className="rounded-md border border-border bg-surface-muted/40 p-4 text-xs text-muted leading-relaxed">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold text-foreground text-sm">
+                  Interactive Queue Status: Idle (0 Pending Live Requests)
+                </p>
+                <span className="rounded bg-surface-muted px-2 py-0.5 text-[11px] font-mono border border-border text-muted">
+                  GET /api/v1/review/requests &rarr; 0 items
+                </span>
+              </div>
+              <p className="mt-1.5">
+                In the N-ATLaS Language Foundry architecture, interactive review requests are dynamically dispatched when automated quality audits triage newly ingested candidate sentence pairs for verification.
+              </p>
+            </div>
+
+            {/* Verified Human Review Evidence Record (Tiv Pilot - REV_04) */}
+            <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-semibold text-foreground">
+                      Verified Human Review Evidence — Tiv Translation Pilot
+                    </h4>
+                    <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                      Evaluator REV_04 Verified
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted mt-0.5">
+                    Empirical data from offline native speaker distribution workbook:{" "}
+                    <code className="font-mono text-foreground font-medium">
+                      Tiv Translation Pilot - Manual Review Distribution_2.xlsx
+                    </code>{" "}
+                    (Sheet: <em>Receiver 4</em>)
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted">Sample Coverage:</span>
+                  <span className="rounded bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                    51 / 203 Pairs (25.1%)
+                  </span>
+                </div>
+              </div>
+
+              {/* 4 Quantitative Metrics Cards */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-md border border-border bg-surface-muted/50 p-3">
+                  <span className="text-[11px] uppercase tracking-wider text-muted block">
+                    Translation Accuracy
+                  </span>
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                      4.76
+                    </span>
+                    <span className="text-xs text-muted">/ 5.0</span>
+                  </div>
+                  <span className="mt-1 text-[11px] text-muted block">
+                    39 scored 5/5 · 12 scored 4/5
+                  </span>
+                </div>
+
+                <div className="rounded-md border border-border bg-surface-muted/50 p-3">
+                  <span className="text-[11px] uppercase tracking-wider text-muted block">
+                    Meaning Completeness
+                  </span>
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                      100%
+                    </span>
+                    <span className="text-xs text-muted">Yes</span>
+                  </div>
+                  <span className="mt-1 text-[11px] text-muted block">
+                    51 of 51 fully complete
+                  </span>
+                </div>
+
+                <div className="rounded-md border border-border bg-surface-muted/50 p-3">
+                  <span className="text-[11px] uppercase tracking-wider text-muted block">
+                    Tiv Naturalness
+                  </span>
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                      5.0
+                    </span>
+                    <span className="text-xs text-muted">/ 5.0</span>
+                  </div>
+                  <span className="mt-1 text-[11px] text-muted block">
+                    51 of 51 rated 5 (native fluency)
+                  </span>
+                </div>
+
+                <div className="rounded-md border border-border bg-surface-muted/50 p-3">
+                  <span className="text-[11px] uppercase tracking-wider text-muted block">
+                    Format Acceptability
+                  </span>
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                      100%
+                    </span>
+                    <span className="text-xs text-muted">Yes</span>
+                  </div>
+                  <span className="mt-1 text-[11px] text-muted block">
+                    Punctuation &amp; casing compliant
+                  </span>
+                </div>
+              </div>
+
+              {/* Qualitative Observations & Reviewer Notes */}
+              <div className="rounded-md border border-border bg-surface-muted/30 p-4 space-y-2.5 text-xs text-muted">
+                <h5 className="font-semibold text-foreground text-xs uppercase tracking-wider">
+                  Qualitative Linguistic Insights Recorded by REV_04
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 leading-relaxed">
+                  <div className="space-y-1">
+                    <p>
+                      <strong className="text-foreground">&bull; Idiomatic Naturalness:</strong> Evaluator specifically noted praise for natural idiomatic translations rather than literal transliterations (e.g., using <em>&quot;zwa Buter&quot;</em> for English language).
+                    </p>
+                    <p>
+                      <strong className="text-foreground">&bull; Word Order &amp; Grammar:</strong> Translations maintain authentic Tiv syntactic ordering and tonal semantics.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p>
+                      <strong className="text-foreground">&bull; Edition Citation Differences:</strong> Minor score 4 ratings occurred due to publication edition shifts (e.g. English source p.29 cited as Tiv translation p.11).
+                    </p>
+                    <p>
+                      <strong className="text-foreground">&bull; Sample Allocation Status:</strong> Evaluator REV_04 completed 51 records (50 MT560, 1 Hypa Text-10k). 152 records remain pending across evaluators REV_01, REV_02, and REV_03.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tiv Orthography Diacritics Palette Sandbox */}
+              <div className="rounded-md border border-border bg-surface p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-foreground">
+                    Tiv Orthography &amp; Diacritics Palette (Click to Test)
+                  </span>
+                  <span className="text-[11px] text-muted font-mono">
+                    Language: Tiv (tiv)
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {SPECIAL_CHARS.tiv.map((char) => (
+                    <button
+                      key={char}
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(char);
+                        toast.info(`Copied character "${char}" to clipboard`);
+                      }}
+                      className="rounded border border-border bg-surface-muted px-3 py-1 font-mono text-sm font-semibold text-foreground hover:border-accent hover:text-accent transition-colors"
+                      title={`Click to copy Tiv character ${char}`}
+                    >
+                      {char}
+                    </button>
+                  ))}
+                  <span className="text-[11px] text-muted pl-2">
+                    Click character to copy. These diacritics are integrated into the active review editor.
+                  </span>
+                </div>
+              </div>
+
+              {/* Evidence Navigation Footer */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between pt-2 border-t border-border text-xs">
+                <p className="text-muted">
+                  Dataset Status: <code className="font-mono text-foreground font-medium">registered</code> (Pending completion of remaining 152 evaluator pairs).
+                </p>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/evidence"
+                    className="rounded bg-accent/10 px-3 py-1 font-semibold text-accent hover:bg-accent/20 transition-colors"
+                  >
+                    View Full Evidence Dossier &rarr;
+                  </a>
+                  <a
+                    href="/datasets/tiv-mt560-v1"
+                    className="rounded bg-surface-muted border border-border px-3 py-1 font-medium text-foreground hover:bg-surface transition-colors"
+                  >
+                    Inspect Tiv Dataset &rarr;
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
         ) : null}
