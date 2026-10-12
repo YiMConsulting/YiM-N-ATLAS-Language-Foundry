@@ -225,9 +225,10 @@ export interface HumanReviewSummary {
 ### Dataset split
 
 ``` ts
-export type SplitStrategy = "random";
+export type SplitStrategy = "random" | "grouped_by_input";
 
 export interface DatasetSplit {
+
   id: string;
   dataset_id: string;
   strategy: SplitStrategy;
@@ -402,10 +403,11 @@ backend. The base prefix is `/api/v1`.
   `GET`             `/review/requests/{id}/summary`            Read review summary Proposed
 
   `POST`            `/datasets/{dataset_id}/splits`            Create split        Proposed
-
-  `GET`             `/splits/{split_id}`                       Split details       Proposed
+  `GET`             `/datasets/{dataset_id}/splits`            List dataset splits Implemented (verified)
+  `GET`             `/splits/{split_id}`                       Split details       Implemented (verified)
 
   `GET`             `/experiments`                             List/filter         Proposed
+
                                                                experiments         
 
   `POST`            `/experiments`                             Create experiment   Proposed

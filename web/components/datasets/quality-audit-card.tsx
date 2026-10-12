@@ -1,53 +1,50 @@
-import type { DatasetQuality } from "@/lib/datasets";
+import type { DatasetDto } from "@/lib/api-client";
 
-const checks: { key: keyof DatasetQuality; label: string }[] = [
-  { key: "missing_values", label: "Missing values" },
-  { key: "empty_records", label: "Empty records" },
-  { key: "duplicates", label: "Duplicates" },
-  { key: "malformed_rows", label: "Malformed rows" },
-  { key: "possible_non_language", label: "Possible non-Igala" },
-];
+export function QualityAuditCard({ dataset }: { dataset: DatasetDto }) {
+  const isAudited =
+    dataset.status === "audited" ||
+    dataset.status === "reviewed" ||
+    dataset.status === "ready";
 
-function countColor(key: keyof DatasetQuality, value: number): string {
-  if (value === 0) {
-    return "text-emerald-600 dark:text-emerald-300";
-  }
-  if (key === "possible_non_language") {
-    return "text-red-600 dark:text-red-300";
-  }
-  return "text-amber-600 dark:text-amber-300";
-}
-
-export function QualityAuditCard({ quality }: { quality: DatasetQuality }) {
   return (
     <section className="rounded-lg border border-border bg-surface p-5">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
-        Quality audit
-      </h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
+          Quality Audit
+        </h3>
+        <span className="text-xs text-muted">
+          {isAudited ? "Audited" : "Pending Audit"}
+        </span>
+      </div>
 
-      <ul className="mt-4 space-y-3">
-        {checks.map(({ key, label }) => {
-          const value = quality[key];
+      <div className="mt-4 rounded-md border border-border bg-surface-muted/40 p-4 text-sm text-muted">
+        {isAudited ? (
+          <p>
+            This dataset is marked as audited, but detailed syntactic and diacritic check scores have not yet been exposed via the API.
+          </p>
+        ) : (
+          <p>
+            Quality audit has not yet been executed for this dataset. Detailed checks for empty records, duplicates, formatting, and language consistency will appear once automated auditing is performed.
+          </p>
+        )}
+      </div>
 
-          return (
-            <li key={key} className="flex items-center justify-between gap-4">
-              <span className="text-sm text-muted">{label}</span>
-              <span className="flex items-center gap-2">
-                <span
-                  className={`text-sm font-semibold tabular-nums ${countColor(key, value)}`}
-                >
-                  {value}
-                </span>
-                {key === "possible_non_language" && value > 0 ? (
-                  <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-300">
-                    flagged
-                  </span>
-                ) : null}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="mt-4 space-y-2 text-xs text-muted">
+        <div className="flex justify-between">
+          <span>Automated quality checks:</span>
+          <span className="font-medium text-amber-600 dark:text-amber-400">
+            {isAudited ? "Completed" : "Not performed"}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span>Linguistic review:</span>
+          <span className="font-medium text-muted">
+            {dataset.status === "reviewed" || dataset.status === "ready"
+              ? "Completed"
+              : "Pending"}
+          </span>
+        </div>
+      </div>
     </section>
   );
 }

@@ -8,6 +8,9 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+import json
+from pathlib import Path
+
 from foundry.review.human_review import (
     HumanReviewSummary,
     ReviewDecision,
@@ -16,6 +19,7 @@ from foundry.review.human_review import (
     ReviewRequestStatus,
     ReviewSampleItem,
 )
+from foundry.datasets.split import DatasetSplit
 from api.schemas.language import Language, LanguageStatus
 
 app = FastAPI(
@@ -105,6 +109,19 @@ DATASETS: dict[str, dict[str, Any]] = {
         "updated_at": NOW.isoformat(),
     },
 }
+
+SPLITS: dict[str, dict[str, Any]] = {}
+
+processed_dir = Path("data/processed")
+if processed_dir.is_dir():
+    for split_meta_path in processed_dir.glob("*/split_metadata.json"):
+        try:
+            with split_meta_path.open("r", encoding="utf-8") as f:
+                meta = json.load(f)
+                DatasetSplit.model_validate(meta)
+                SPLITS[meta["id"]] = meta
+        except Exception:
+            pass
 
 # Review Requests & Sample Items
 DEFAULT_REVIEW_REQUEST_ID = "rev_req_igl_001"
@@ -305,6 +322,24 @@ def get_dataset(dataset_id: str):
     if not ds:
         raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found")
     return ds
+
+
+# --- Splits ---
+@app.get("/splits/{split_id}")
+@app.get("/api/v1/splits/{split_id}")
+def get_split(split_id: str):
+    split = SPLITS.get(split_id)
+    if not split:
+        raise HTTPException(status_code=404, detail=f"Split '{split_id}' not found")
+    return split
+
+@app.get("/datasets/{dataset_id}/splits")
+@app.get("/api/v1/datasets/{dataset_id}/splits")
+def list_dataset_splits(dataset_id: str):
+    if dataset_id not in DATASETS:
+        raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found")
+    items = [s for s in SPLITS.values() if s.get("dataset_id") == dataset_id]
+    return {"items": items, "total": len(items)}
 
 
 # --- Human Review Endpoints (James's Schema Contract) ---

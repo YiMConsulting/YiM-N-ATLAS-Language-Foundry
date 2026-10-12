@@ -73,3 +73,39 @@ def test_playground_generate_returns_503_while_unavailable(client):
     response = client.post("/api/v1/playground/generate", json=payload)
     assert response.status_code == 503
     assert "unavailable" in response.json()["detail"].lower()
+
+
+def test_get_verified_split_by_id(client):
+    response = client.get("/api/v1/splits/tiv-mt560-v1-split-42")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == "tiv-mt560-v1-split-42"
+    assert data["dataset_id"] == "tiv-mt560-v1"
+    assert data["strategy"] == "grouped_by_input"
+    assert data["seed"] == 42
+    assert data["total_records"] == 184099
+    assert data["train_records"] == 138074
+    assert data["validation_records"] == 18410
+    assert data["test_records"] == 27615
+
+
+def test_get_unknown_split_returns_404(client):
+    response = client.get("/api/v1/splits/nonexistent-split")
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
+
+
+def test_list_dataset_splits_returns_verified_split(client):
+    response = client.get("/api/v1/datasets/tiv-mt560-v1/splits")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] >= 1
+    split_ids = [s["id"] for s in data["items"]]
+    assert "tiv-mt560-v1-split-42" in split_ids
+
+
+def test_list_unknown_dataset_splits_returns_404(client):
+    response = client.get("/api/v1/datasets/nonexistent-dataset/splits")
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
+

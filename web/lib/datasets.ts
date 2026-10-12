@@ -1,4 +1,14 @@
+/**
+ * MIGRATION NOTE (Checkpoint 3):
+ * The datasets list and detail UI have been migrated to the real Foundry API
+ * via `foundryApi.listDatasets()` and `foundryApi.getDataset(id)` in `@/lib/api-client`.
+ *
+ * This mock file is retained for reference or any future mock consumers,
+ * but should not be used by dataset UI routes.
+ */
+
 export type DatasetQualityStatus = "passed" | "needs_review" | "failed";
+
 
 export type DatasetQuality = {
   missing_values: number;
