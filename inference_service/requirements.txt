@@ -2,11 +2,12 @@
 # Dedicated for GPU execution (provider-neutral, Modal/serverless GPU target)
 
 # Core ML and generation stack
-torch>=2.1.0,<2.5.0
-transformers>=4.38.0,<4.45.0
-peft>=0.9.0,<0.13.0
-accelerate>=0.28.0,<0.34.0
-bitsandbytes>=0.42.0
+# Note: N-ATLaS (Llama-3 architecture with rope_type: llama3) requires transformers>=4.40.0
+torch>=2.2.0,<2.6.0
+transformers>=4.40.0,<4.48.0
+peft>=0.10.0,<0.14.0
+accelerate>=0.29.0,<0.35.0
+bitsandbytes>=0.43.0
 
 # API and Configuration
 fastapi>=0.110.0

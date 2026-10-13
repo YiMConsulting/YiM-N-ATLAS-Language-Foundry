@@ -66,6 +66,17 @@ class InferenceConfig(BaseModel):
         default_factory=lambda: int(os.getenv("INFERENCE_PORT", os.getenv("PORT", "8000"))),
         description="Network port binding for inference service.",
     )
+    cors_origins: list[str] = Field(
+        default_factory=lambda: [
+            o.strip()
+            for o in os.getenv(
+                "CORS_ORIGINS",
+                "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000",
+            ).split(",")
+            if o.strip()
+        ],
+        description="Explicit list of trusted CORS origins.",
+    )
 
     # Generation token limits
     default_max_new_tokens: int = Field(
@@ -105,10 +116,16 @@ class InferenceConfig(BaseModel):
         description="Optional quantization mode: None, '4bit', or '8bit'.",
     )
 
-    # Credentials
+    # Credentials and authentication
     hf_token: Optional[str] = Field(
         default_factory=lambda: os.getenv("HF_TOKEN", None),
         description="Hugging Face access token for gated model repositories.",
+        repr=False,
+    )
+    api_key: Optional[str] = Field(
+        default_factory=lambda: os.getenv("INFERENCE_API_KEY", None),
+        description="Optional shared secret API key for authenticating incoming requests.",
+        repr=False,
     )
 
     @field_validator("base_revision", "adapter_revision")
@@ -148,6 +165,10 @@ class InferenceConfig(BaseModel):
             if normalized_q not in ("4bit", "8bit"):
                 raise ValueError(
                     f"Unsupported quantization '{self.quantization}'. Allowed options are None, '4bit', or '8bit'."
+                )
+            if self.device == "cpu":
+                raise ValueError(
+                    f"Quantization '{normalized_q}' requires GPU hardware and is unsupported with device='cpu'."
                 )
             self.quantization = normalized_q
 

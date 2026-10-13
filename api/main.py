@@ -27,6 +27,12 @@ from foundry.review.human_review import (
 from foundry.datasets.split import DatasetSplit
 from api.schemas.language import Language, LanguageStatus
 from api.schemas.review_evidence import DatasetReviewEvidence
+from api.schemas.inference import (
+    InferenceStatusResponse,
+    PlaygroundRequest,
+    PlaygroundResponse,
+)
+from api.services.inference_client import InferenceGatewayClient
 
 app = FastAPI(
     title="N-ATLaS Language Foundry API",
@@ -511,18 +517,31 @@ def get_experiment(exp_id: str):
     return exp
 
 
-# --- Playground Generation ---
-class PlaygroundRequest(BaseModel):
-    prompt: str
-    language_code: Optional[str] = "tiv"
-    experiment_id: Optional[str] = None
-    max_new_tokens: Optional[int] = 64
-    do_sample: Optional[bool] = False
+# --- Inference Gateway Integration ---
+inference_client = InferenceGatewayClient()
 
-@app.post("/playground/generate")
-@app.post("/api/v1/playground/generate")
+
+@app.post("/playground/generate", response_model=PlaygroundResponse)
+@app.post("/api/v1/playground/generate", response_model=PlaygroundResponse)
 def playground_generate(req: PlaygroundRequest):
-    raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail="Model inference is currently unavailable. Real inference endpoints are pending model hosting and adapter deployment.",
+    """
+    Generate translation via standalone inference service gateway.
+    Maps prompt to upstream text and enforces bounds (max_new_tokens <= 256).
+    """
+    return inference_client.generate(
+        prompt=req.prompt,
+        max_new_tokens=req.max_new_tokens,
+        experiment_id=req.experiment_id,
+        language_code=req.language_code,
     )
+
+
+@app.get("/inference/status", response_model=InferenceStatusResponse)
+@app.get("/api/v1/inference/status", response_model=InferenceStatusResponse)
+def get_inference_status():
+    """
+    Truthful status of upstream inference engine and model readiness.
+    Never fabricates model readiness if the upstream service is unavailable.
+    """
+    return inference_client.get_status()
+

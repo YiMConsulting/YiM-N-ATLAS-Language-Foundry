@@ -244,3 +244,62 @@ def test_engine_generation_error_handling(test_config):
 
     with pytest.raises(RuntimeError, match="Inference generation error"):
         engine.generate("Test sentence")
+
+
+def test_engine_concurrent_load_model_is_thread_safe(test_config):
+    """Multiple concurrent threads attempting load_model must only load once."""
+    import concurrent.futures
+    import time
+
+    load_call_count = 0
+
+    def slow_model_loader(*args, **kwargs):
+        nonlocal load_call_count
+        load_call_count += 1
+        time.sleep(0.05)
+        return MockModel()
+
+    engine = ModelEngine(
+        config=test_config,
+        model_loader=slow_model_loader,
+        tokenizer_loader=lambda *a, **k: MockTokenizer(),
+        adapter_loader=lambda b, *a, **k: MockModel(),
+    )
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(engine.load_model) for _ in range(5)]
+        for f in futures:
+            f.result()
+
+    assert engine.is_loaded
+    assert load_call_count == 1
+
+
+def test_engine_load_failure_recovery(test_config):
+    """Engine resets state on failure, and can succeed on a subsequent retry."""
+    should_fail = True
+
+    def flakey_loader(*args, **kwargs):
+        if should_fail:
+            raise ConnectionError("Network blip")
+        return MockModel()
+
+    engine = ModelEngine(
+        config=test_config,
+        model_loader=flakey_loader,
+        tokenizer_loader=lambda *a, **k: MockTokenizer(),
+        adapter_loader=lambda b, *a, **k: MockModel(),
+    )
+
+    # First attempt fails cleanly
+    with pytest.raises(RuntimeError):
+        engine.load_model()
+    assert not engine.is_loaded
+    assert engine.model is None
+
+    # Subsequent retry succeeds cleanly
+    should_fail = False
+    engine.load_model()
+    assert engine.is_loaded
+    assert engine.model is not None
+

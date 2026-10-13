@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import threading
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
@@ -63,6 +64,10 @@ class ModelEngine:
         self.tokenizer: Any = None
         self._is_loaded: bool = False
 
+        # Thread synchronization locks for concurrent requests
+        self._load_lock = threading.Lock()
+        self._inference_lock = threading.Lock()
+
     @property
     def is_loaded(self) -> bool:
         """Return whether the model and adapter are loaded into memory."""
@@ -72,106 +77,118 @@ class ModelEngine:
         """
         Load the base model, tokenizer, and LoRA adapter once.
         Subsequent calls are idempotent unless force_reload=True.
+        Thread-safe: serializes concurrent load attempts.
         """
-        if self._is_loaded and not force_reload:
-            logger.info("Model and adapter are already loaded; skipping redundant initialization.")
-            return
+        with self._load_lock:
+            if self._is_loaded and not force_reload:
+                logger.info("Model and adapter are already loaded; skipping redundant initialization.")
+                return
 
-        logger.info(
-            "Initializing N-ATLaS model engine: base=%s@%s, adapter=%s@%s",
-            self.config.base_model,
-            self.config.base_revision,
-            self.config.adapter_repo,
-            self.config.adapter_revision,
-        )
+            logger.info(
+                "Initializing N-ATLaS model engine: base=%s@%s, adapter=%s@%s",
+                self.config.base_model,
+                self.config.base_revision,
+                self.config.adapter_repo,
+                self.config.adapter_revision,
+            )
 
-        try:
-            # 1. Hugging Face credentials check (base model is gated)
-            token = self.config.require_hf_token()
+            try:
+                # 1. Hugging Face credentials check (base model is gated)
+                token = self.config.require_hf_token()
 
-            # 2. Load tokenizer
-            if self._tokenizer_loader:
-                self.tokenizer = self._tokenizer_loader(
-                    self.config.base_model,
-                    revision=self.config.base_revision,
-                    token=token,
-                )
-            else:
-                from transformers import AutoTokenizer  # lazy import
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    self.config.base_model,
-                    revision=self.config.base_revision,
-                    token=token,
-                )
-
-            # 3. Load base model
-            if self._model_loader:
-                base_model_instance = self._model_loader(
-                    self.config.base_model,
-                    revision=self.config.base_revision,
-                    token=token,
-                )
-            else:
-                import torch
-                from transformers import AutoModelForCausalLM
-
-                model_kwargs: dict[str, Any] = {
-                    "revision": self.config.base_revision,
-                    "token": token,
-                }
-
-                if self.config.quantization:
-                    # Quantization constraint: requires bitsandbytes and CUDA support
-                    from transformers import BitsAndBytesConfig
-                    if self.config.quantization == "4bit":
-                        model_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True)
-                    elif self.config.quantization == "8bit":
-                        model_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
+                # 2. Load tokenizer
+                if self._tokenizer_loader:
+                    self.tokenizer = self._tokenizer_loader(
+                        self.config.base_model,
+                        revision=self.config.base_revision,
+                        token=token,
+                    )
                 else:
-                    if self.config.torch_dtype == "float16":
-                        model_kwargs["torch_dtype"] = torch.float16
-                    elif self.config.torch_dtype == "bfloat16":
-                        model_kwargs["torch_dtype"] = torch.bfloat16
-                    elif self.config.torch_dtype == "float32":
-                        model_kwargs["torch_dtype"] = torch.float32
+                    from transformers import AutoTokenizer  # lazy import
+                    self.tokenizer = AutoTokenizer.from_pretrained(
+                        self.config.base_model,
+                        revision=self.config.base_revision,
+                        token=token,
+                    )
 
-                if self.config.device != "cpu":
-                    model_kwargs["device_map"] = self.config.device
+                # 3. Load base model
+                if self._model_loader:
+                    base_model_instance = self._model_loader(
+                        self.config.base_model,
+                        revision=self.config.base_revision,
+                        token=token,
+                    )
+                else:
+                    import torch
+                    from transformers import AutoModelForCausalLM
 
-                base_model_instance = AutoModelForCausalLM.from_pretrained(
-                    self.config.base_model,
-                    **model_kwargs,
-                )
+                    model_kwargs: dict[str, Any] = {
+                        "revision": self.config.base_revision,
+                        "token": token,
+                    }
 
-            # 4. Attach PEFT LoRA adapter
-            if self._adapter_loader:
-                self.model = self._adapter_loader(
-                    base_model_instance,
-                    self.config.adapter_repo,
-                    revision=self.config.adapter_revision,
-                    token=token,
-                )
-            else:
-                from peft import PeftModel  # lazy import
-                self.model = PeftModel.from_pretrained(
-                    base_model_instance,
-                    self.config.adapter_repo,
-                    revision=self.config.adapter_revision,
-                    token=token,
-                )
+                    if self.config.quantization:
+                        # Quantization constraint: requires bitsandbytes and CUDA support
+                        from transformers import BitsAndBytesConfig
+                        compute_dtype = (
+                            torch.float16 if self.config.torch_dtype == "float16"
+                            else torch.bfloat16 if self.config.torch_dtype == "bfloat16"
+                            else torch.float32
+                        )
+                        if self.config.quantization == "4bit":
+                            model_kwargs["quantization_config"] = BitsAndBytesConfig(
+                                load_in_4bit=True,
+                                bnb_4bit_compute_dtype=compute_dtype,
+                            )
+                        elif self.config.quantization == "8bit":
+                            model_kwargs["quantization_config"] = BitsAndBytesConfig(
+                                load_in_8bit=True,
+                            )
+                    else:
+                        if self.config.torch_dtype == "float16":
+                            model_kwargs["torch_dtype"] = torch.float16
+                        elif self.config.torch_dtype == "bfloat16":
+                            model_kwargs["torch_dtype"] = torch.bfloat16
+                        elif self.config.torch_dtype == "float32":
+                            model_kwargs["torch_dtype"] = torch.float32
 
-            if hasattr(self.model, "eval"):
-                self.model.eval()
+                    if self.config.device != "cpu":
+                        model_kwargs["device_map"] = self.config.device
 
-            self._is_loaded = True
-            logger.info("Successfully loaded N-ATLaS base model and Tiv LoRA adapter.")
+                    base_model_instance = AutoModelForCausalLM.from_pretrained(
+                        self.config.base_model,
+                        **model_kwargs,
+                    )
 
-        except Exception as exc:
-            self._is_loaded = False
-            self.model = None
-            self.tokenizer = None
-            logger.error("Failed to load model engine: %s", exc)
-            raise RuntimeError(f"Model engine initialization failed: {exc}") from exc
+                # 4. Attach PEFT LoRA adapter
+                if self._adapter_loader:
+                    self.model = self._adapter_loader(
+                        base_model_instance,
+                        self.config.adapter_repo,
+                        revision=self.config.adapter_revision,
+                        token=token,
+                    )
+                else:
+                    from peft import PeftModel  # lazy import
+                    self.model = PeftModel.from_pretrained(
+                        base_model_instance,
+                        self.config.adapter_repo,
+                        revision=self.config.adapter_revision,
+                        token=token,
+                    )
+
+                if hasattr(self.model, "eval"):
+                    self.model.eval()
+
+                self._is_loaded = True
+                logger.info("Successfully loaded N-ATLaS base model and Tiv LoRA adapter.")
+
+            except Exception as exc:
+                self._is_loaded = False
+                self.model = None
+                self.tokenizer = None
+                logger.error("Failed to load model engine: %s", exc)
+                raise RuntimeError(f"Model engine initialization failed: {exc}") from exc
 
     @contextlib.contextmanager
     def _inference_mode(self):
@@ -216,50 +233,51 @@ class ModelEngine:
 
         rendered_prompt = self.prompt_builder.render_prompt(self.tokenizer, clean_text)
 
-        try:
-            tokenized = self.tokenizer(rendered_prompt, return_tensors="pt")
+        with self._inference_lock:
+            try:
+                tokenized = self.tokenizer(rendered_prompt, return_tensors="pt")
 
-            # Transfer to model device if available
-            if hasattr(self.model, "device"):
-                target_device = self.model.device
-                tokenized = {k: v.to(target_device) if hasattr(v, "to") else v for k, v in tokenized.items()}
+                # Transfer to model device if available
+                if hasattr(self.model, "device"):
+                    target_device = self.model.device
+                    tokenized = {k: v.to(target_device) if hasattr(v, "to") else v for k, v in tokenized.items()}
 
-            gen_kwargs: dict[str, Any] = {
-                "max_new_tokens": effective_tokens,
-                "do_sample": self.config.do_sample,
-            }
-            if self.config.do_sample:
-                gen_kwargs["temperature"] = self.config.temperature
+                gen_kwargs: dict[str, Any] = {
+                    "max_new_tokens": effective_tokens,
+                    "do_sample": self.config.do_sample,
+                }
+                if self.config.do_sample:
+                    gen_kwargs["temperature"] = self.config.temperature
 
-            pad_id = getattr(self.tokenizer, "pad_token_id", None) or getattr(self.tokenizer, "eos_token_id", None)
-            if pad_id is not None:
-                gen_kwargs["pad_token_id"] = pad_id
+                pad_id = getattr(self.tokenizer, "pad_token_id", None) or getattr(self.tokenizer, "eos_token_id", None)
+                if pad_id is not None:
+                    gen_kwargs["pad_token_id"] = pad_id
 
-            with self._inference_mode():
-                output_ids = self.model.generate(**tokenized, **gen_kwargs)
+                with self._inference_mode():
+                    output_ids = self.model.generate(**tokenized, **gen_kwargs)
 
-            # Strip input prompt token sequence from output
-            input_length = tokenized["input_ids"].shape[-1]
-            generated_ids = output_ids[:, input_length:]
+                # Strip input prompt token sequence from output
+                input_length = tokenized["input_ids"].shape[-1]
+                generated_ids = output_ids[:, input_length:]
 
-            decoded = self.tokenizer.decode(generated_ids[0], skip_special_tokens=True).strip()
+                decoded = self.tokenizer.decode(generated_ids[0], skip_special_tokens=True).strip()
 
-            return GenerationResult(
-                generated_text=decoded,
-                prompt=rendered_prompt,
-                base_model=self.config.base_model,
-                base_revision=self.config.base_revision,
-                adapter_repo=self.config.adapter_repo,
-                adapter_revision=self.config.adapter_revision,
-                model_status=self.config.model_status,
-                is_smoke_test_preview=True,
-                disclaimer=(
-                    "This output was generated by the diagnostic smoke-test adapter (smoke_test_preview). "
-                    "It has NOT been translation-quality validated and must not be treated as production quality."
-                ),
-                max_new_tokens=effective_tokens,
-            )
+                return GenerationResult(
+                    generated_text=decoded,
+                    prompt=rendered_prompt,
+                    base_model=self.config.base_model,
+                    base_revision=self.config.base_revision,
+                    adapter_repo=self.config.adapter_repo,
+                    adapter_revision=self.config.adapter_revision,
+                    model_status=self.config.model_status,
+                    is_smoke_test_preview=True,
+                    disclaimer=(
+                        "This output was generated by the diagnostic smoke-test adapter (smoke_test_preview). "
+                        "It has NOT been translation-quality validated and must not be treated as production quality."
+                    ),
+                    max_new_tokens=effective_tokens,
+                )
 
-        except Exception as exc:
-            logger.error("Generation failed for input '%s': %s", clean_text[:50], exc)
-            raise RuntimeError(f"Inference generation error: {exc}") from exc
+            except Exception as exc:
+                logger.error("Generation failed for input '%s': %s", clean_text[:50], exc)
+                raise RuntimeError(f"Inference generation error: {exc}") from exc

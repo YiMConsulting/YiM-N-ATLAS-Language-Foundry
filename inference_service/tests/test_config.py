@@ -113,3 +113,40 @@ def test_config_present_hf_token(monkeypatch):
 
     cfg_arg = InferenceConfig(hf_token="hf_direct_token_456")
     assert cfg_arg.require_hf_token() == "hf_direct_token_456"
+
+
+def test_config_secret_masking():
+    """Ensure HF token and INFERENCE_API_KEY are never leaked in repr() or str() output of config."""
+    secret = "hf_super_secret_token_xyz987"
+    api_sec = "super_secret_api_key_456"
+    cfg = InferenceConfig(hf_token=secret, api_key=api_sec)
+    assert secret not in repr(cfg)
+    assert secret not in str(cfg)
+    assert api_sec not in repr(cfg)
+    assert api_sec not in str(cfg)
+
+
+def test_config_quantization_rejects_cpu_device():
+    """Quantization requires GPU hardware and fails if device='cpu'."""
+    with pytest.raises(ValidationError) as exc_info:
+        InferenceConfig(quantization="4bit", device="cpu")
+    assert "requires GPU hardware" in str(exc_info.value)
+
+    with pytest.raises(ValidationError) as exc_info:
+        InferenceConfig(quantization="8bit", device="cpu")
+    assert "requires GPU hardware" in str(exc_info.value)
+
+
+def test_config_cors_origins_defaults_and_env(monkeypatch):
+    """CORS origins default to trusted local origins, and accept explicit overrides."""
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    cfg = InferenceConfig()
+    assert "http://localhost:3000" in cfg.cors_origins
+    assert "http://127.0.0.1:3000" in cfg.cors_origins
+    assert "*" not in cfg.cors_origins
+
+    monkeypatch.setenv("CORS_ORIGINS", "https://app.example.com, https://api.example.com")
+    cfg_custom = InferenceConfig()
+    assert cfg_custom.cors_origins == ["https://app.example.com", "https://api.example.com"]
+
+

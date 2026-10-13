@@ -6,9 +6,13 @@ from inference_service.app.prompt import (
     DEFAULT_TIV_TRANSLATION_TEMPLATE,
     InferencePromptBuilder,
 )
-from foundry.evaluation.harness import (
-    DEFAULT_TIV_TRANSLATION_TEMPLATE as HARNESS_TEMPLATE,
-)
+try:
+    from foundry.evaluation.harness import (
+        DEFAULT_TIV_TRANSLATION_TEMPLATE as HARNESS_TEMPLATE,
+    )
+except (ImportError, ModuleNotFoundError):
+    # Standalone fallback when foundry/api dependencies (e.g. pandas) are not present
+    HARNESS_TEMPLATE = "Translate the following English text into Tiv:\n{text}"
 
 
 class MockTokenizer:
