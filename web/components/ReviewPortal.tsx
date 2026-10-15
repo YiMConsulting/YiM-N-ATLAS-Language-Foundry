@@ -2,16 +2,18 @@
 
 import axios from "axios";
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { CheckIcon, XIcon } from "@/components/icons";
 import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   foundryApi,
   type ReviewRequestDto,
   type ReviewSampleItemDto,
   type ReviewDecision,
   type BatchSubmitResponseDto,
-  type DatasetReviewEvidenceDto,
 } from "@/lib/api-client";
 import { useLanguage } from "@/components/layout/language-provider";
 
@@ -32,19 +34,20 @@ type ItemDecision = {
 export function ReviewPortal() {
   const { activeLanguage } = useLanguage();
   const mountedRef = useRef(true);
+  const correctionInputRef = useRef<HTMLInputElement>(null);
 
   const [reviewRequests, setReviewRequests] = useState<ReviewRequestDto[]>([]);
   const [selectedRequestId, setSelectedRequestId] = useState<string>("");
   const [samples, setSamples] = useState<ReviewSampleItemDto[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [reviewerId, setReviewerId] = useState("");
+  const [reviewerId, setReviewerId] = useState("linguist-reviewer-1");
   const [decisions, setDecisions] = useState<Record<string, ItemDecision>>({});
   const [isLoadingRequests, setIsLoadingRequests] = useState(true);
   const [isLoadingSamples, setIsLoadingSamples] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isReadOnly, setIsReadOnly] = useState(false);
   const [submittedPayload, setSubmittedPayload] = useState<BatchSubmitResponseDto | null>(null);
-  const [reviewEvidence, setReviewEvidence] = useState<DatasetReviewEvidenceDto | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -53,34 +56,31 @@ export function ReviewPortal() {
     };
   }, []);
 
-  const fetchRequests = useCallback(async () => {
+  const handleRefresh = useCallback(async () => {
     setIsLoadingRequests(true);
     setError(null);
     try {
-      const [reqsRes, evRes] = await Promise.allSettled([
-        foundryApi.listReviewRequests(),
-        foundryApi.getDatasetReviewEvidence("tiv-mt560-v1"),
-      ]);
+      const reqsRes = await foundryApi.listReviewRequests();
       if (!mountedRef.current) return;
-      if (reqsRes.status === "fulfilled") {
-        setReviewRequests(reqsRes.value.items);
-        if (reqsRes.value.items.length > 0) {
-          setSelectedRequestId(reqsRes.value.items[0].id);
-        } else {
-          setSelectedRequestId("");
-          setSamples([]);
-        }
-      }
-      if (evRes.status === "fulfilled") {
-        setReviewEvidence(evRes.value);
+      setReviewRequests(reqsRes.items);
+      if (reqsRes.items.length > 0) {
+        setSelectedRequestId(reqsRes.items[0].id);
+      } else {
+        setSelectedRequestId("");
+        setSamples([]);
       }
     } catch (err: unknown) {
       if (!mountedRef.current) return;
-      const message = axios.isAxiosError(err)
-        ? err.response?.data?.detail || err.message
-        : "Failed to connect to review queue endpoint.";
-      setError(message);
-      toast.error(message);
+      if (axios.isAxiosError(err) && err.response?.status === 403) {
+        setIsReadOnly(true);
+        setError("Human review endpoints are operating in read-only mode on this deployment.");
+      } else {
+        const message = axios.isAxiosError(err)
+          ? err.response?.data?.detail || err.message
+          : "Failed to connect to review queue endpoint.";
+        setError(message);
+        toast.error(message);
+      }
     } finally {
       if (mountedRef.current) {
         setIsLoadingRequests(false);
@@ -91,28 +91,28 @@ export function ReviewPortal() {
   useEffect(() => {
     let active = true;
 
-    async function initialLoad() {
+    async function loadInitial() {
       try {
-        const [reqsRes, evRes] = await Promise.allSettled([
-          foundryApi.listReviewRequests(),
-          foundryApi.getDatasetReviewEvidence("tiv-mt560-v1"),
-        ]);
+        const reqsRes = await foundryApi.listReviewRequests();
         if (!active) return;
-        if (reqsRes.status === "fulfilled") {
-          setReviewRequests(reqsRes.value.items);
-          if (reqsRes.value.items.length > 0) {
-            setSelectedRequestId(reqsRes.value.items[0].id);
-          }
-        }
-        if (evRes.status === "fulfilled") {
-          setReviewEvidence(evRes.value);
+        setReviewRequests(reqsRes.items);
+        if (reqsRes.items.length > 0) {
+          setSelectedRequestId(reqsRes.items[0].id);
+        } else {
+          setSelectedRequestId("");
+          setSamples([]);
         }
       } catch (err: unknown) {
         if (!active) return;
-        const message = axios.isAxiosError(err)
-          ? err.response?.data?.detail || err.message
-          : "Failed to connect to review queue endpoint.";
-        setError(message);
+        if (axios.isAxiosError(err) && err.response?.status === 403) {
+          setIsReadOnly(true);
+          setError("Human review endpoints are operating in read-only mode on this deployment.");
+        } else {
+          const message = axios.isAxiosError(err)
+            ? err.response?.data?.detail || err.message
+            : "Failed to connect to review queue endpoint.";
+          setError(message);
+        }
       } finally {
         if (active) {
           setIsLoadingRequests(false);
@@ -120,7 +120,7 @@ export function ReviewPortal() {
       }
     }
 
-    initialLoad();
+    loadInitial();
 
     return () => {
       active = false;
@@ -193,13 +193,13 @@ export function ReviewPortal() {
     }));
 
     if (decision === "correct") {
-      toast.success(`Sample ${currentSample.id} marked correct`);
+      toast.success(`Sample #${currentIndex + 1} marked accurate`);
     } else if (decision === "needs_correction") {
-      toast.info(`Marked for orthography correction`);
+      toast.info(`Marked for correction`);
     } else {
-      toast.error(`Sample ${currentSample.id} marked incorrect`);
+      toast.error(`Sample #${currentIndex + 1} marked incorrect`);
     }
-  }, [currentSample, decisions]);
+  }, [currentSample, currentIndex, decisions]);
 
   // Keyboard shortcut listener for rapid reviewer triage
   useEffect(() => {
@@ -251,11 +251,23 @@ export function ReviewPortal() {
   };
 
   const insertDiacritic = (char: string) => {
-    const currentCorrection =
+    const input = correctionInputRef.current;
+    const currentVal =
       currentDecision?.suggested_correction ?? currentSample?.expected_text ?? "";
-    updateDecisionDetails({
-      suggested_correction: currentCorrection + char,
-    });
+
+    if (input) {
+      const start = input.selectionStart ?? currentVal.length;
+      const end = input.selectionEnd ?? currentVal.length;
+      const nextVal = currentVal.substring(0, start) + char + currentVal.substring(end);
+      updateDecisionDetails({ suggested_correction: nextVal });
+
+      setTimeout(() => {
+        input.focus();
+        input.setSelectionRange(start + char.length, start + char.length);
+      }, 10);
+    } else {
+      updateDecisionDetails({ suggested_correction: currentVal + char });
+    }
   };
 
   const handleSubmitBatch = async () => {
@@ -265,7 +277,7 @@ export function ReviewPortal() {
     }
 
     if (!reviewerId.trim()) {
-      toast.warning("Please enter your Reviewer ID or name before submitting.");
+      toast.warning("Please enter your Reviewer ID before submitting.");
       return;
     }
 
@@ -274,9 +286,7 @@ export function ReviewPortal() {
       return;
     }
 
-    if (isSubmitting) {
-      return;
-    }
+    if (isSubmitting) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -301,14 +311,21 @@ export function ReviewPortal() {
 
       if (!mountedRef.current) return;
       setSubmittedPayload(res);
-      toast.success(`Successfully recorded ${res.processed_decisions} audit decisions.`);
+      toast.success(`Recorded ${res.processed_decisions} audit decisions.`);
     } catch (err: unknown) {
       if (!mountedRef.current) return;
-      const message = axios.isAxiosError(err)
-        ? err.response?.data?.detail || err.message
-        : "Failed to submit review batch to backend.";
-      setError(message);
-      toast.error(message);
+      if (axios.isAxiosError(err) && err.response?.status === 403) {
+        setIsReadOnly(true);
+        const msg = "Review submission rejected: System is operating in READ_ONLY_MODE.";
+        setError(msg);
+        toast.error(msg);
+      } else {
+        const message = axios.isAxiosError(err)
+          ? err.response?.data?.detail || err.message
+          : "Failed to submit review batch to backend.";
+        setError(message);
+        toast.error(message);
+      }
     } finally {
       if (mountedRef.current) {
         setIsSubmitting(false);
@@ -320,530 +337,336 @@ export function ReviewPortal() {
     SPECIAL_CHARS[activeLanguage.language_code] || SPECIAL_CHARS.tiv;
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-8 max-w-5xl mx-auto pb-16">
+      {/* Fluid Editorial Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-baseline sm:justify-between border-b border-border pb-6">
         <div>
           <div className="flex items-center gap-2.5">
-            <h2 className="text-2xl font-semibold tracking-tight">Human Linguistic Review</h2>
-            {isLoadingRequests ? (
-              <span className="text-xs text-muted">Loading queue…</span>
-            ) : reviewRequests.length > 0 ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                Active Requests Available ({reviewRequests.length})
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-[11px] font-medium text-muted">
-                Queue Empty
-              </span>
-            )}
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              Human Review
+            </h1>
+            <Badge variant="accent">Verification Gate</Badge>
           </div>
-          <p className="mt-1 text-sm text-muted">
-            Native speaker linguistic audit and verification gate for underserved Nigerian languages.
+          <p className="mt-1.5 text-sm text-foreground-secondary">
+            Native speaker validation and orthographic auditing for {activeLanguage.name} ({activeLanguage.language_code}).
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label htmlFor="reviewer-id-input" className="text-xs font-medium text-muted">
-            Reviewer ID:
-          </label>
+        {/* Reviewer Identifier */}
+        <div className="flex items-center gap-2 text-xs text-foreground-secondary">
+          <span>Reviewer</span>
           <input
             id="reviewer-id-input"
             type="text"
             value={reviewerId}
             onChange={(e) => setReviewerId(e.target.value)}
-            className="rounded-md border border-border bg-surface px-3 py-1 text-xs font-semibold text-foreground placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-            placeholder="e.g. linguist-reviewer-1"
+            disabled={isReadOnly}
+            className="w-36 rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-mono font-medium text-foreground placeholder:text-foreground-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent disabled:opacity-50"
+            placeholder="reviewer-id"
           />
         </div>
       </div>
 
-      {/* Review Request Queue Selector */}
-      <section className="rounded-lg border border-border bg-surface p-5">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
-          Review Request Queue
-        </h3>
+      {isReadOnly && (
+        <div className="rounded-lg border border-warning-border bg-warning-soft px-4 py-3 text-xs text-warning flex items-center justify-between">
+          <span>
+            <strong>Read-only mode active:</strong> Submissions are disabled on this instance. Triage actions can be practiced locally but will not persist.
+          </span>
+          <Badge variant="warning">Read Only</Badge>
+        </div>
+      )}
 
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="w-full sm:w-96">
+      {/* Interactive Queue Control Bar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-1 text-sm">
+        <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-3">
+          <span className="text-xs font-medium text-foreground-secondary shrink-0">
+            Batch Queue
+          </span>
+          <div className="w-full sm:w-80">
             {isLoadingRequests ? (
-              <div className="h-9 w-full animate-pulse rounded-md border border-border bg-surface-muted" />
+              <div className="h-8 w-full animate-pulse rounded border border-border bg-surface-secondary" />
             ) : reviewRequests.length > 0 ? (
               <Select
                 options={reviewRequests.map((r) => ({
                   value: r.id,
-                  label: `${r.id} (${r.dataset_id} · ${r.status})`,
+                  label: `${r.id} · ${r.dataset_id} (${r.status})`,
                 }))}
                 value={selectedRequestId}
-                onChange={(id) => {
-                  setSelectedRequestId(id);
-                }}
+                onChange={setSelectedRequestId}
                 ariaLabel="Select review request"
               />
             ) : (
-              <Select
-                options={[{ value: "", label: "No review requests in queue" }]}
-                value=""
-                onChange={() => {}}
-                ariaLabel="No review requests in queue"
-              />
+              <div className="flex h-8 items-center rounded border border-border bg-surface-secondary px-3 text-xs text-foreground-muted">
+                0 active requests in queue
+              </div>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {currentRequest ? (
-              <>
-                <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent">
-                  Dataset: {currentRequest.dataset_id}
-                </span>
-                <span className="inline-flex items-center rounded-full bg-surface-muted px-2.5 py-0.5 text-xs font-medium text-muted border border-border">
-                  Status: {currentRequest.status}
-                </span>
-                <span className="text-xs text-muted">
-                  Target Sample Size: {currentRequest.sample_size}
-                </span>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={fetchRequests}
-                className="text-xs text-accent hover:underline"
-              >
-                Refresh Queue
-              </button>
-            )}
-          </div>
+          {currentRequest && (
+            <span className="text-xs text-foreground-muted">
+              {currentRequest.sample_size} target pairs
+            </span>
+          )}
         </div>
 
-        {/* Empty Queue State & Verified Evidence Presentation */}
-        {!isLoadingRequests && reviewRequests.length === 0 ? (
-          <div className="mt-5 space-y-5">
-            <div className="rounded-xl border border-border bg-surface-muted/40 p-4 text-xs text-muted leading-relaxed flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-foreground text-sm">
-                  Review Queue Idle · 0 Pending Tasks
-                </p>
-                <p className="mt-0.5">
-                  All current evaluation batches have been processed. Showing verified baseline annotations from the Tiv pilot below.
-                </p>
-              </div>
-              <span className="rounded-lg bg-surface px-2.5 py-1 text-xs font-mono border border-border text-muted">
-                Queue Clean
+        <div className="flex items-center gap-3 text-xs">
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={isLoadingRequests}
+            className="font-medium text-accent hover:underline disabled:opacity-50 cursor-pointer"
+          >
+            {isLoadingRequests ? "Refreshing…" : "Refresh queue"}
+          </button>
+          <span className="text-foreground-muted">·</span>
+          <Link
+            href="/evidence"
+            className="font-medium text-foreground-secondary hover:text-foreground transition-colors"
+          >
+            Offline Evidence Dossier
+          </Link>
+        </div>
+      </div>
+
+      {error && !isReadOnly && (
+        <div className="rounded-lg border border-error-border bg-error-soft px-4 py-3 text-xs text-error">
+          Notice: {error}
+        </div>
+      )}
+
+      {isLoadingSamples && (
+        <div className="py-16 text-center space-y-3">
+          <div className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+          <p className="text-xs text-foreground-muted">Loading review samples from queue…</p>
+        </div>
+      )}
+
+      {/* ACTIVE AUDIT WORKBENCH */}
+      {!isLoadingSamples && reviewRequests.length > 0 && samples.length > 0 && currentSample && (
+        <div className="space-y-6">
+          {/* Progress & Quick Metrics Strip (Unboxed) */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-2 border-b border-border text-xs text-foreground-secondary">
+            <div className="flex items-center gap-3">
+              <span>
+                Sample <strong className="text-foreground">{currentIndex + 1}</strong> of {samples.length}
               </span>
-            </div>
-
-            {/* Verified Human Review Evidence Record (Tiv Pilot - REV_04) */}
-            <div className="rounded-xl border border-border bg-surface p-6 space-y-5 shadow-xs">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4">
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <h4 className="text-base font-semibold text-foreground">
-                      Verified Baseline Metrics · Tiv Translation Pilot
-                    </h4>
-                    <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                      REV_04 Verified
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted mt-1">
-                    Native speaker audit conducted on 51 parallel sentence pairs from the pilot corpus.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted">Sample Progress:</span>
-                  <span className="rounded-md bg-blue-500/10 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300 border border-blue-500/20">
-                    51 / 203 Pairs (25.1%)
-                  </span>
-                </div>
-              </div>
-
-              {/* 4 Quantitative Metrics Cards */}
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-lg border border-border bg-surface-muted/40 p-4">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted block">
-                    Translation Accuracy
-                  </span>
-                  <div className="mt-1 flex items-baseline gap-1.5">
-                    <span className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                      4.76
-                    </span>
-                    <span className="text-xs text-muted">/ 5.0</span>
-                  </div>
-                  <span className="mt-1 text-xs text-muted block">
-                    39 rated 5/5 · 12 rated 4/5
-                  </span>
-                </div>
-
-                <div className="rounded-lg border border-border bg-surface-muted/40 p-4">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted block">
-                    Meaning Completeness
-                  </span>
-                  <div className="mt-1 flex items-baseline gap-1.5">
-                    <span className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                      100%
-                    </span>
-                    <span className="text-xs text-muted">Yes</span>
-                  </div>
-                  <span className="mt-1 text-xs text-muted block">
-                    Zero omission / hallucinations
-                  </span>
-                </div>
-
-                <div className="rounded-lg border border-border bg-surface-muted/40 p-4">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted block">
-                    Tiv Naturalness
-                  </span>
-                  <div className="mt-1 flex items-baseline gap-1.5">
-                    <span className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                      5.0
-                    </span>
-                    <span className="text-xs text-muted">/ 5.0</span>
-                  </div>
-                  <span className="mt-1 text-xs text-muted block">
-                    100% native fluency rating
-                  </span>
-                </div>
-
-                <div className="rounded-lg border border-border bg-surface-muted/40 p-4">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted block">
-                    Format Acceptability
-                  </span>
-                  <div className="mt-1 flex items-baseline gap-1.5">
-                    <span className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                      100%
-                    </span>
-                    <span className="text-xs text-muted">Yes</span>
-                  </div>
-                  <span className="mt-1 text-xs text-muted block">
-                    Punctuation &amp; casing preserved
-                  </span>
-                </div>
-              </div>
-
-              {/* Qualitative Observations & Reviewer Notes */}
-              <div className="rounded-lg border border-border bg-surface-muted/30 p-4 space-y-2 text-xs text-muted">
-                <h5 className="font-semibold text-foreground text-xs uppercase tracking-wider">
-                  Qualitative Findings (Evaluator REV_04)
-                </h5>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 leading-relaxed">
-                  <ul className="space-y-1.5">
-                    <li className="flex items-start gap-2">
-                      <span className="text-accent font-bold">&bull;</span>
-                      <span>
-                        <strong className="text-foreground">Idiomatic Phrasing:</strong> Validated natural Tiv phrasing (e.g. <em>&quot;zwa Buter&quot;</em> for English language) rather than direct calques.
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-accent font-bold">&bull;</span>
-                      <span>
-                        <strong className="text-foreground">Word Order:</strong> Preserves natural Tiv syntactic structures and tone semantics.
-                      </span>
-                    </li>
-                  </ul>
-                  <ul className="space-y-1.5">
-                    <li className="flex items-start gap-2">
-                      <span className="text-amber-500 font-bold">&bull;</span>
-                      <span>
-                        <strong className="text-foreground">Publication Edition Shifts:</strong> Score 4 ratings occurred due to publication edition variances (e.g. source page 29 cited as Tiv page 11).
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-blue-500 font-bold">&bull;</span>
-                      <span>
-                        <strong className="text-foreground">Sample Status:</strong> 51 pairs completed; 152 pairs remain queued for subsequent review cycles.
-                      </span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Tiv Orthography Diacritics Palette Sandbox */}
-              <div className="rounded-lg border border-border bg-surface p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground">
-                    Tiv Diacritics Palette (Click to Copy)
-                  </span>
-                  <span className="text-[11px] text-muted font-mono">
-                    Language: Tiv (tiv)
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  {SPECIAL_CHARS.tiv.map((char) => (
-                    <button
-                      key={char}
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard?.writeText(char);
-                        toast.info(`Copied character "${char}" to clipboard`);
-                      }}
-                      className="rounded-md border border-border bg-surface-muted px-3 py-1 font-mono text-sm font-semibold text-foreground hover:border-accent hover:text-accent transition-colors cursor-pointer"
-                      title={`Click to copy Tiv character ${char}`}
-                    >
-                      {char}
-                    </button>
-                  ))}
-                  <span className="text-[11px] text-muted pl-2">
-                    Integrated diacritics keyboard for tonal vowels and digraphs.
-                  </span>
-                </div>
-              </div>
-
-              {/* Navigation Footer */}
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between pt-3 border-t border-border text-xs">
-                <p className="text-muted">
-                  Dataset Status: <code className="font-mono text-foreground font-medium">registered</code> (Pilot baseline validated).
-                </p>
-                <div className="flex items-center gap-2">
-                  <a
-                    href="/evidence"
-                    className="rounded-lg bg-accent/10 px-3 py-1.5 font-semibold text-accent hover:bg-accent/20 transition-colors"
-                  >
-                    View Full Evidence Dossier &rarr;
-                  </a>
-                  <a
-                    href="/datasets/tiv-mt560-v1"
-                    className="rounded-lg bg-surface-muted border border-border px-3 py-1.5 font-medium text-foreground hover:bg-surface transition-colors"
-                  >
-                    Inspect Tiv Dataset &rarr;
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {error ? (
-          <div className="mt-3 rounded border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-700 dark:text-red-300">
-            {error}
-          </div>
-        ) : null}
-      </section>
-
-      {/* Active Audit Section: Only shown when samples exist */}
-      {reviewRequests.length > 0 && samples.length > 0 && currentSample && (
-        <>
-          {/* Audit Progress & Stats Cards */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-lg border border-border bg-surface p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted">Progress</p>
-              <div className="mt-2 flex items-baseline justify-between">
-                <span className="text-2xl font-semibold tabular-nums">
-                  {reviewedCount}/{samples.length}
-                </span>
-                <span className="text-xs font-medium text-accent">{progressPct}%</span>
-              </div>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
+              <div className="h-1.5 w-32 overflow-hidden rounded-full bg-surface-secondary">
                 <div
                   className="h-full bg-accent transition-all duration-300"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
+              <span className="font-medium text-accent">{progressPct}%</span>
             </div>
 
-            <div className="rounded-lg border border-border bg-surface p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted">Correct</p>
-              <p className="mt-2 text-2xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-                {correctCount}
-              </p>
-              <p className="mt-1 text-xs text-muted">Verified accurate</p>
-            </div>
-
-            <div className="rounded-lg border border-border bg-surface p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted">Needs Correction</p>
-              <p className="mt-2 text-2xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">
-                {correctionCount}
-              </p>
-              <p className="mt-1 text-xs text-muted">Orthography adjusted</p>
-            </div>
-
-            <div className="rounded-lg border border-border bg-surface p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted">Incorrect</p>
-              <p className="mt-2 text-2xl font-semibold tabular-nums text-red-600 dark:text-red-400">
-                {incorrectCount}
-              </p>
-              <p className="mt-1 text-xs text-muted">Marked for exclusion</p>
+            <div className="flex items-center gap-3">
+              <span className="text-success font-medium">
+                {correctCount} approved
+              </span>
+              <span className="text-foreground-muted">·</span>
+              <span className="text-warning font-medium">
+                {correctionCount} corrected
+              </span>
+              <span className="text-foreground-muted">·</span>
+              <span className="text-error font-medium">
+                {incorrectCount} rejected
+              </span>
             </div>
           </div>
 
-          {/* Main Review Card */}
-          <section className="rounded-lg border border-border bg-surface p-5 sm:p-6">
-            {/* Card Header */}
-            <div className="flex flex-col gap-2 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <span className="rounded-md bg-accent/10 px-2.5 py-1 text-xs font-bold text-accent">
-                  {currentSample.id}
-                </span>
-                {currentSample.context ? (
-                  <span className="text-xs font-medium text-muted">
-                    Context: {currentSample.context}
-                  </span>
-                ) : null}
-              </div>
-              <div className="flex items-center gap-3">
-                {currentSample.flagged_reason ? (
-                  <span className="text-xs text-amber-600 dark:text-amber-400">
-                    Flagged: {currentSample.flagged_reason}
-                  </span>
-                ) : null}
-                {currentDecision && (
-                  <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      currentDecision.decision === "correct"
-                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                        : currentDecision.decision === "needs_correction"
-                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                        : "bg-red-500/15 text-red-700 dark:text-red-300"
-                    }`}
-                  >
-                    {currentDecision.decision.replace("_", " ")}
+          {/* Focal Review Area */}
+          <div className="space-y-6">
+            {/* Sample ID & Context Header */}
+            <div className="flex items-center justify-between text-xs text-foreground-muted">
+              <div className="flex items-center gap-2">
+                <span className="font-mono">ID: {currentSample.id}</span>
+                {currentSample.context && (
+                  <span className="rounded bg-surface-secondary px-2 py-0.5 text-[11px] text-foreground-secondary">
+                    {currentSample.context}
                   </span>
                 )}
               </div>
+
+              {currentDecision ? (
+                <Badge
+                  variant={
+                    currentDecision.decision === "correct"
+                      ? "success"
+                      : currentDecision.decision === "needs_correction"
+                      ? "warning"
+                      : "error"
+                  }
+                >
+                  {currentDecision.decision.replace("_", " ")}
+                </Badge>
+              ) : (
+                <span className="text-foreground-muted text-[11px]">Unreviewed</span>
+              )}
             </div>
 
-            {/* Bilingual Comparison Panels */}
-            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="rounded-lg border border-border bg-surface-muted p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-                  Input Text
-                </p>
-                <p className="mt-2 text-base font-medium text-foreground">
+            {/* Parallel Bilingual Reading Layout */}
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {/* Source (English) */}
+              <div className="rounded-xl bg-surface-secondary/50 p-6 space-y-2">
+                <div className="text-xs font-medium text-foreground-muted">
+                  English source
+                </div>
+                <p className="text-base text-foreground leading-relaxed">
                   {currentSample.input_text}
                 </p>
               </div>
 
-              <div className="rounded-lg border border-accent/30 bg-accent/5 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-accent">
-                  Target Translation
-                </p>
-                <p className="mt-2 text-base font-semibold text-foreground">
+              {/* Target (African Language) */}
+              <div className="rounded-xl bg-accent-soft p-6 space-y-2 border border-accent/15">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-accent">
+                    {activeLanguage.name} translation
+                  </span>
+                  <span className="font-mono text-[11px] text-foreground-muted uppercase">
+                    {activeLanguage.language_code}
+                  </span>
+                </div>
+                <p className="text-xl font-medium font-linguistic text-foreground leading-relaxed">
                   {currentSample.expected_text}
                 </p>
               </div>
             </div>
 
-            {/* Decision Buttons */}
-            <div className="mt-6">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-                Linguistic Decision
-              </p>
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {/* Ergonomic Decision Dock */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between text-xs text-foreground-muted">
+                <span>Linguistic judgment</span>
+                <span className="hidden sm:inline">Shortcuts: 1, 2, 3 (or left / right keys)</span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {/* 1. Mark Correct */}
                 <button
                   type="button"
                   onClick={() => handleDecision("correct")}
-                  className={`inline-flex items-center justify-between gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-all ${
+                  className={`flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-medium transition-colors cursor-pointer ${
                     currentDecision?.decision === "correct"
-                      ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
-                      : "border-border bg-surface text-foreground hover:bg-surface-muted hover:border-emerald-500/40"
+                      ? "border-accent bg-accent text-accent-contrast shadow-subtle"
+                      : "border-border bg-surface text-foreground hover:bg-surface-secondary"
                   }`}
                 >
                   <span className="flex items-center gap-2">
                     <CheckIcon className="h-4 w-4" />
-                    Mark Correct
+                    Accurate &amp; Natural
                   </span>
-                  <kbd className="rounded bg-surface-muted/80 px-1.5 py-0.5 text-[10px] font-mono border border-border/80 text-muted">
+                  <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-mono text-foreground-muted">
                     1
                   </kbd>
                 </button>
 
+                {/* 2. Needs Correction */}
                 <button
                   type="button"
                   onClick={() => handleDecision("needs_correction")}
-                  className={`inline-flex items-center justify-between gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-all ${
+                  className={`flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-medium transition-colors cursor-pointer ${
                     currentDecision?.decision === "needs_correction"
-                      ? "border-amber-500 bg-amber-500 text-white shadow-sm"
-                      : "border-border bg-surface text-foreground hover:bg-surface-muted hover:border-amber-500/40"
+                      ? "border-warning bg-warning text-white shadow-subtle"
+                      : "border-border bg-surface text-foreground hover:bg-surface-secondary"
                   }`}
                 >
-                  <span>Needs Correction</span>
-                  <kbd className="rounded bg-surface-muted/80 px-1.5 py-0.5 text-[10px] font-mono border border-border/80 text-muted">
+                  <span>Suggest Correction</span>
+                  <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-mono text-foreground-muted">
                     2
                   </kbd>
                 </button>
 
+                {/* 3. Mark Incorrect */}
                 <button
                   type="button"
                   onClick={() => handleDecision("incorrect")}
-                  className={`inline-flex items-center justify-between gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-all ${
+                  className={`flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-medium transition-colors cursor-pointer ${
                     currentDecision?.decision === "incorrect"
-                      ? "border-red-600 bg-red-600 text-white shadow-sm"
-                      : "border-border bg-surface text-foreground hover:bg-surface-muted hover:border-red-500/40"
+                      ? "border-error bg-error text-white shadow-subtle"
+                      : "border-border bg-surface text-foreground hover:bg-surface-secondary"
                   }`}
                 >
                   <span className="flex items-center gap-2">
                     <XIcon className="h-4 w-4" />
-                    Mark Incorrect
+                    Inaccurate
                   </span>
-                  <kbd className="rounded bg-surface-muted/80 px-1.5 py-0.5 text-[10px] font-mono border border-border/80 text-muted">
+                  <kbd className="rounded bg-black/5 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-mono text-foreground-muted">
                     3
                   </kbd>
                 </button>
               </div>
             </div>
 
-            {/* Diacritics Keyboard Bar & Correction Area */}
+            {/* Diacritics Keyboard Bar & Correction Workspace */}
             {currentDecision?.decision === "needs_correction" && (
-              <div className="mt-5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+              <div className="rounded-xl border border-warning-border bg-warning-soft/60 p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                    Orthography &amp; Tone Diacritics Toolbar
-                  </p>
-                  <span className="text-xs text-muted">Click diacritic to insert</span>
+                  <span className="text-xs font-semibold text-warning">
+                    Insert diacritics &amp; tone marks:
+                  </span>
+                  <span className="text-[11px] text-foreground-muted">
+                    Click character to insert at cursor
+                  </span>
                 </div>
 
-                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1.5">
                   {activeSpecialChars.map((char) => (
                     <button
                       key={char}
                       type="button"
                       onClick={() => insertDiacritic(char)}
-                      className="inline-flex h-8 min-w-8 items-center justify-center rounded border border-border bg-surface px-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent/10 hover:border-accent"
+                      className="inline-flex h-8 min-w-8 items-center justify-center rounded border border-border bg-surface px-2.5 font-mono text-sm font-semibold text-foreground transition-colors hover:border-accent cursor-pointer"
+                      title={`Insert ${char}`}
                     >
                       {char}
                     </button>
                   ))}
                 </div>
 
-                <input
-                  type="text"
-                  value={currentDecision.suggested_correction || ""}
-                  onChange={(e) =>
-                    updateDecisionDetails({ suggested_correction: e.target.value })
-                  }
-                  placeholder="Corrected translation with tones…"
-                  className="mt-3 w-full rounded-md border border-border bg-surface p-2.5 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-                />
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-foreground-secondary block">
+                    Corrected text:
+                  </label>
+                  <input
+                    ref={correctionInputRef}
+                    type="text"
+                    value={currentDecision.suggested_correction || ""}
+                    onChange={(e) =>
+                      updateDecisionDetails({ suggested_correction: e.target.value })
+                    }
+                    placeholder="Enter revised translation…"
+                    className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium font-linguistic text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  />
+                </div>
               </div>
             )}
 
-            {/* Linguistic Notes */}
-            <div className="mt-5">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-muted">
-                Linguistic Notes / Justification
+            {/* Reviewer Note */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground-secondary block">
+                Reviewer field notes (optional)
               </label>
               <input
                 type="text"
                 value={currentDecision?.comment || ""}
                 onChange={(e) => updateDecisionDetails({ comment: e.target.value })}
-                placeholder="e.g. Tone diacritic mark adjusted; natural native phrasing."
-                className="mt-2 w-full rounded-md border border-border bg-surface p-2.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                placeholder="e.g. Tone diacritic mark adjusted; idiom validated."
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-foreground placeholder:text-foreground-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               />
             </div>
 
-            {/* Card Navigation Footer */}
-            <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
-              <button
-                type="button"
+            {/* Pagination & Jump Rail */}
+            <div className="flex items-center justify-between border-t border-border pt-4">
+              <Button
+                variant="outline"
+                size="sm"
                 disabled={currentIndex === 0}
                 onClick={() => setCurrentIndex((p) => Math.max(0, p - 1))}
-                className="inline-flex items-center rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
               >
                 ‹ Previous
-              </button>
+              </Button>
 
-              {/* Jump Pills */}
-              <div className="flex gap-1.5 overflow-x-auto py-1">
+              {/* Sample Jump Pills */}
+              <div className="flex gap-1 overflow-x-auto max-w-sm py-1 px-2">
                 {samples.map((s, idx) => {
                   const dec = decisions[s.id]?.decision;
                   return (
@@ -851,19 +674,20 @@ export function ReviewPortal() {
                       key={s.id}
                       type="button"
                       onClick={() => setCurrentIndex(idx)}
-                      className={`h-7 w-7 rounded-full text-xs font-semibold transition-all ${
+                      className={`h-6 w-6 shrink-0 rounded text-[11px] font-medium transition-colors cursor-pointer ${
                         idx === currentIndex
-                          ? "ring-2 ring-accent ring-offset-2 ring-offset-background"
+                          ? "ring-2 ring-accent ring-offset-1 ring-offset-background"
                           : ""
                       } ${
                         dec === "correct"
-                          ? "bg-emerald-600 text-white"
+                          ? "bg-accent text-accent-contrast"
                           : dec === "needs_correction"
-                          ? "bg-amber-500 text-white"
+                          ? "bg-warning text-white"
                           : dec === "incorrect"
-                          ? "bg-red-600 text-white"
-                          : "bg-surface-muted text-muted hover:bg-border"
+                          ? "bg-error text-white"
+                          : "bg-surface-secondary text-foreground-muted hover:bg-surface-tertiary"
                       }`}
+                      title={`Sample ${idx + 1}`}
                     >
                       {idx + 1}
                     </button>
@@ -871,67 +695,91 @@ export function ReviewPortal() {
                 })}
               </div>
 
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                size="sm"
                 disabled={currentIndex === samples.length - 1}
                 onClick={() => setCurrentIndex((p) => Math.min(samples.length - 1, p + 1))}
-                className="inline-flex items-center rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Next ›
-              </button>
+              </Button>
             </div>
-          </section>
+          </div>
 
-          {/* Batch Submit Action Banner */}
-          <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
+          {/* Submission Bar (Unboxed) */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-border pt-6">
             <div>
               <p className="text-sm font-semibold text-foreground">
-                Batch Status: {correctCount} Correct · {correctionCount} Corrected · {incorrectCount} Incorrect
+                Batch session · {reviewedCount} of {samples.length} processed
               </p>
-              <p className="mt-0.5 text-xs text-muted">
-                Target Dataset: {currentRequest?.dataset_id}
+              <p className="text-xs text-foreground-secondary">
+                Review decisions will be permanently committed to the dataset provenance trail.
               </p>
             </div>
 
-            <button
-              type="button"
-              disabled={reviewedCount === 0 || isSubmitting}
+            <Button
+              variant="primary"
+              disabled={reviewedCount === 0 || isSubmitting || isReadOnly}
               onClick={handleSubmitBatch}
-              className="inline-flex items-center justify-center rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSubmitting ? "Submitting to Backend…" : "Submit Audit Batch"}
-            </button>
-          </section>
-        </>
+              {isSubmitting ? "Submitting…" : "Commit review batch"}
+            </Button>
+          </div>
+        </div>
       )}
 
-      {/* When request has 0 samples */}
-      {reviewRequests.length > 0 && !isLoadingSamples && samples.length === 0 && (
-        <div className="rounded-lg border border-border bg-surface p-6 text-center text-sm text-muted">
-          No sample records are associated with review request &ldquo;{selectedRequestId}&rdquo;.
+      {/* IDLE / EMPTY STATE */}
+      {!isLoadingRequests && !isLoadingSamples && (reviewRequests.length === 0 || samples.length === 0) && (
+        <div className="py-16 text-center space-y-4">
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-accent-soft text-accent">
+            <CheckIcon className="h-5 w-5" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold text-foreground">
+              Review queue is clear
+            </h2>
+            <p className="text-xs text-foreground-secondary max-w-md mx-auto">
+              There are no pending interactive human review requests in the queue.
+              All active dataset batches have either been verified or are waiting for new audit requests.
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <Link
+              href="/evidence"
+              className="inline-flex items-center rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-accent-contrast hover:bg-accent-hover transition-colors"
+            >
+              Inspect Offline Evidence Dossier
+            </Link>
+            <Link
+              href="/datasets"
+              className="inline-flex items-center rounded-lg border border-border bg-surface px-4 py-2 text-xs font-medium text-foreground hover:bg-surface-secondary transition-colors"
+            >
+              Browse Datasets
+            </Link>
+          </div>
         </div>
       )}
 
       {/* Submission Success Confirmation */}
       {submittedPayload && (
-        <section className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-5">
+        <div className="rounded-xl border border-success-border bg-success-soft p-5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <CheckIcon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                Review Batch Successfully Recorded in Backend
+              <CheckIcon className="h-5 w-5 text-success" />
+              <p className="text-sm font-semibold text-foreground">
+                Review batch successfully recorded
               </p>
             </div>
-            <span className="text-xs text-muted">{submittedPayload.timestamp}</span>
+            <span className="text-xs text-foreground-muted">{submittedPayload.timestamp}</span>
           </div>
-          <p className="mt-2 text-xs text-muted">
+          <p className="text-xs text-foreground-secondary">
             {submittedPayload.message} (Dataset: {submittedPayload.dataset_id}, Reviewer:{" "}
             {submittedPayload.reviewer_id})
           </p>
-          <pre className="mt-3 overflow-x-auto rounded-md border border-border bg-surface p-3 font-mono text-xs text-foreground">
+          <pre className="overflow-x-auto rounded-lg border border-border bg-surface p-3 font-mono text-xs text-foreground">
             {JSON.stringify(submittedPayload, null, 2)}
           </pre>
-        </section>
+        </div>
       )}
     </div>
   );

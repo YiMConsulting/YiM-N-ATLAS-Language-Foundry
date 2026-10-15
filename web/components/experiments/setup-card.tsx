@@ -3,27 +3,44 @@ import type { ExperimentDto } from "@/lib/api-client";
 
 export function SetupCard({ experiment }: { experiment: ExperimentDto }) {
   return (
-    <section className="rounded-lg border border-border bg-surface p-5">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
-        Setup
-      </h3>
-      <dl className="mt-3 divide-y divide-border">
-        <KvRow label="Language" value={experiment.language_code.toUpperCase()} />
-        <KvRow label="Base model" value={experiment.base_model} />
-        <KvRow
-          label="Datasets"
-          value={experiment.dataset_ids.join(", ")}
-        />
-        <KvRow label="Split ID" value={<span className="font-mono text-xs">{experiment.split_id}</span>} />
-        <KvRow
-          label="Hardware"
-          value={`${experiment.runtime.hardware} (${experiment.runtime.device})`}
-        />
-        <KvRow
-          label="Precision"
-          value={experiment.runtime.precision ?? "Unavailable"}
-        />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between border-b border-border pb-3">
+        <h3 className="text-sm font-medium text-foreground">
+          Environment &amp; Hardware Topology
+        </h3>
+        <span className="rounded-full bg-surface-secondary px-2.5 py-0.5 text-[11px] font-mono uppercase text-foreground-secondary">
+          {experiment.language_code}
+        </span>
+      </div>
+      <dl className="divide-y divide-border text-xs">
+        <div className="py-2.5">
+          <KvRow label="Target Language" value={experiment.language_code.toUpperCase()} />
+        </div>
+        <div className="py-2.5">
+          <KvRow label="Base Model" value={<span className="font-mono text-xs text-foreground">{experiment.base_model}</span>} />
+        </div>
+        <div className="py-2.5">
+          <KvRow
+            label="Corpus Datasets"
+            value={<span className="font-mono text-xs text-foreground">{experiment.dataset_ids.join(", ")}</span>}
+          />
+        </div>
+        <div className="py-2.5">
+          <KvRow label="Deterministic Split" value={<span className="font-mono text-xs text-foreground">{experiment.split_id}</span>} />
+        </div>
+        <div className="py-2.5">
+          <KvRow
+            label="Hardware Target"
+            value={`${experiment.runtime.hardware} (${experiment.runtime.device})`}
+          />
+        </div>
+        <div className="py-2.5">
+          <KvRow
+            label="Compute Precision"
+            value={experiment.runtime.precision ?? "bf16"}
+          />
+        </div>
       </dl>
-    </section>
+    </div>
   );
 }

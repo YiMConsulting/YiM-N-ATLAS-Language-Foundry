@@ -159,21 +159,44 @@ export type PlaygroundRequest = {
   do_sample?: boolean;
 };
 
+export type InferenceStatusResponse = {
+  available: boolean;
+  model_loaded: boolean;
+  message?: string | null;
+  base_model: string;
+  base_revision: string;
+  adapter_repo: string;
+  adapter_revision: string;
+  model_status: string;
+  is_smoke_test_preview: boolean;
+  quality_validated: boolean;
+  disclaimer: string;
+  device?: string | null;
+  torch_dtype?: string | null;
+  quantization?: string | null;
+};
+
 /**
  * Expected schema for playground generation response.
- * Note: The backend endpoint POST /api/v1/playground/generate currently returns HTTP 503
- * unconditionally (inference workers are not yet deployed) and does not define an explicit
- * Pydantic response model. The frontend strictly validates that generated_text is present
- * and of string type before treating any response as successful.
+ * Backed by api.schemas.inference.PlaygroundResponse.
  */
 export type PlaygroundResponse = {
   prompt?: string;
   generated_text?: string;
+  rendered_prompt?: string | null;
   language_code?: string;
   model?: string;
-  experiment_id?: string | null;
+  base_model?: string;
+  base_revision?: string;
+  adapter_repo?: string;
+  adapter_revision?: string;
+  model_status?: string;
+  is_smoke_test_preview?: boolean;
+  disclaimer?: string;
   latency_ms?: number;
+  experiment_id?: string | null;
 };
+
 
 
 export const foundryApi = {
@@ -242,6 +265,13 @@ export const foundryApi = {
     const response = await apiClient.post<PlaygroundResponse>(
       "/playground/generate",
       request,
+    );
+    return response.data;
+  },
+
+  async getInferenceStatus() {
+    const response = await apiClient.get<InferenceStatusResponse>(
+      "/inference/status",
     );
     return response.data;
   },
