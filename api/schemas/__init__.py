@@ -24,6 +24,11 @@ from api.schemas.review_evidence import (
     MetricScoreSummary,
     ReviewerScopeSummary,
 )
+from api.schemas.inference import (
+    PlaygroundRequest,
+    PlaygroundResponse,
+    InferenceStatusResponse,
+)
 
 __all__ = [
     "Language",
@@ -46,4 +51,7 @@ __all__ = [
     "DatasetReviewEvidence",
     "MetricScoreSummary",
     "ReviewerScopeSummary",
+    "PlaygroundRequest",
+    "PlaygroundResponse",
+    "InferenceStatusResponse",
 ]

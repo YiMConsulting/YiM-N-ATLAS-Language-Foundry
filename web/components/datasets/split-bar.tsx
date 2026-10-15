@@ -3,17 +3,18 @@ import type { DatasetSplitDto } from "@/lib/api-client";
 export function SplitBar({ split }: { split: DatasetSplitDto | null }) {
   if (!split) {
     return (
-      <section className="rounded-lg border border-border bg-surface p-5">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
-            Verified Dataset Split
-          </h3>
-          <span className="text-xs text-muted">Verification Status</span>
+      <div className="space-y-2 py-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-foreground">Dataset Partitions</span>
+          <span className="rounded-full bg-surface-secondary px-2.5 py-0.5 text-[11px] text-foreground-muted">
+            Unsplit
+          </span>
         </div>
-        <div className="mt-4 rounded-md border border-border bg-surface-muted/40 p-4 text-sm text-muted">
-          No verified split metadata is available for this dataset. Split generation must be run deterministically through the Foundry pipeline before train, validation, and test partitions can be confirmed.
-        </div>
-      </section>
+        <p className="text-xs text-foreground-secondary leading-relaxed">
+          No verified split metadata discovered for this dataset. Deterministic split generation must be
+          executed before training and test evaluation partitions can be confirmed.
+        </p>
+      </div>
     );
   }
 
@@ -22,45 +23,77 @@ export function SplitBar({ split }: { split: DatasetSplitDto | null }) {
   const testPct = (split.test_ratio * 100).toFixed(1);
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-5">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4 py-2">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
-            Verified Dataset Split
-          </h3>
-          <p className="mt-0.5 text-xs text-muted font-mono">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-medium text-foreground">
+              Deterministic Partition Distribution
+            </h2>
+            <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">
+              Leakage Protected
+            </span>
+          </div>
+          <p className="mt-0.5 text-xs font-mono text-foreground-muted">
             {split.id} · strategy: {split.strategy} · seed: {split.seed}
           </p>
         </div>
-        <span className="text-xs text-muted">Test set is held out</span>
+        <span className="text-xs text-foreground-secondary">
+          Total: <strong className="font-medium text-foreground">{split.total_records.toLocaleString()}</strong> parallel pairs
+        </span>
       </div>
 
-      <div className="mt-4 flex h-3 w-full overflow-hidden rounded-full bg-surface-muted">
-        <div className="bg-accent" style={{ width: `${trainPct}%` }} />
-        <div className="bg-accent/60" style={{ width: `${valPct}%` }} />
-        <div className="bg-amber-500" style={{ width: `${testPct}%` }} />
-      </div>
+      {/* Visual Partition Bar */}
+      <div className="space-y-3">
+        <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-secondary">
+          <div
+            className="bg-accent transition-all duration-300"
+            style={{ width: `${trainPct}%` }}
+            title={`Train: ${trainPct}%`}
+          />
+          <div
+            className="bg-accent/60 transition-all duration-300"
+            style={{ width: `${valPct}%` }}
+            title={`Validation: ${valPct}%`}
+          />
+          <div
+            className="bg-warning transition-all duration-300"
+            style={{ width: `${testPct}%` }}
+            title={`Test: ${testPct}%`}
+          />
+        </div>
 
-      <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-        <li className="flex items-center gap-2 text-sm">
-          <span className="h-2.5 w-2.5 rounded-full bg-accent" />
-          <span className="text-muted">Train:</span>
-          <span className="font-medium">{split.train_records.toLocaleString()}</span>
-          <span className="text-xs text-muted">({trainPct}%)</span>
-        </li>
-        <li className="flex items-center gap-2 text-sm">
-          <span className="h-2.5 w-2.5 rounded-full bg-accent/60" />
-          <span className="text-muted">Validation:</span>
-          <span className="font-medium">{split.validation_records.toLocaleString()}</span>
-          <span className="text-xs text-muted">({valPct}%)</span>
-        </li>
-        <li className="flex items-center gap-2 text-sm">
-          <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-          <span className="text-muted">Test:</span>
-          <span className="font-medium">{split.test_records.toLocaleString()}</span>
-          <span className="text-xs text-muted">({testPct}%)</span>
-        </li>
-      </ul>
-    </section>
+        {/* Legend / Metrics */}
+        <div className="flex flex-wrap items-center gap-6 pt-1 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-accent shrink-0" />
+            <span className="text-foreground-secondary">Train:</span>
+            <span className="font-medium text-foreground">
+              {split.train_records.toLocaleString()}
+            </span>
+            <span className="text-[11px] text-foreground-muted">({trainPct}%)</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-accent/60 shrink-0" />
+            <span className="text-foreground-secondary">Validation:</span>
+            <span className="font-medium text-foreground">
+              {split.validation_records.toLocaleString()}
+            </span>
+            <span className="text-[11px] text-foreground-muted">({valPct}%)</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-warning shrink-0" />
+            <span className="text-foreground-secondary">Held-Out Test:</span>
+            <span className="font-medium text-foreground">
+              {split.test_records.toLocaleString()}
+            </span>
+            <span className="text-[11px] text-foreground-muted">({testPct}%)</span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
+
