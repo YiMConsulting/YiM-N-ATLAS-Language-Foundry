@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { ExperimentsList } from "@/components/experiments/experiments-list";
+import { Badge } from "@/components/ui/badge";
 import { foundryApi, type ExperimentDto } from "@/lib/api-client";
 
 export const metadata: Metadata = {
   title: "Experiments | N-ATLAS Language Foundry",
-  description: "Record of adaptation runs in the Foundry.",
+  description: "Audited registry of LoRA model adaptation runs across Nigerian languages.",
 };
 
 export const instant = false;
@@ -24,17 +25,26 @@ export default async function ExperimentsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Experiments</h2>
-        <p className="mt-1 text-sm text-muted">
-          Record of every adaptation run in the Foundry.
-        </p>
+    <div className="space-y-6 max-w-6xl mx-auto pb-16">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-5">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+              Experiments &amp; Adaptation Runs
+            </h1>
+            <Badge variant="neutral">
+              {experiments.length} Runs Recorded
+            </Badge>
+          </div>
+          <p className="mt-1 text-xs text-muted sm:text-sm">
+            Audited execution log of base model adaptation runs, LoRA hyperparameter schedules, and checkpoint artifacts.
+          </p>
+        </div>
       </div>
 
       {error ? (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-600 dark:text-red-400">
-          Failed to load experiments: {error}
+        <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-4 text-xs text-destructive">
+          <strong>Notice:</strong> Failed to load experiments: {error}
         </div>
       ) : (
         <ExperimentsList experiments={experiments} />

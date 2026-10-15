@@ -2,62 +2,64 @@
 
 import { usePathname } from "next/navigation";
 import { MenuIcon } from "@/components/icons";
-import { LanguageSelector } from "@/components/layout/language-selector";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { SystemStatus } from "@/components/layout/system-status";
 
-const ROUTE_TITLES: Record<string, string> = {
-  "/": "Overview & Health",
-  "/languages": "Language Registry",
-  "/datasets": "Datasets & Provenance",
-  "/evidence": "Evidence Dossier",
-  "/review": "Human Linguistic Review",
-  "/experiments": "Experiment Registry",
-  "/playground": "Inference Studio",
+const ROUTE_TITLES: Record<string, { section: string; title: string }> = {
+  "/": { section: "Foundry", title: "Product Story" },
+  "/workspace": { section: "Foundry", title: "Workspace Overview" },
+  "/roadmap": { section: "Planning", title: "Product Roadmap" },
+  "/languages": { section: "Registry", title: "Languages" },
+  "/datasets": { section: "Data", title: "Datasets & Splits" },
+  "/evidence": { section: "Verification", title: "Evidence Dossier" },
+  "/review": { section: "Verification", title: "Human Review" },
+  "/experiments": { section: "Training", title: "Experiments" },
+  "/results": { section: "Evaluation", title: "Results" },
+  "/playground": { section: "Inference", title: "Playground" },
 };
 
 export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
   const pathname = usePathname();
-  const currentTitle =
-    ROUTE_TITLES[pathname] ||
-    (pathname.startsWith("/datasets/")
-      ? "Dataset Detail"
-      : pathname.startsWith("/languages/")
-      ? "Language Detail"
-      : pathname.startsWith("/experiments/")
-      ? "Experiment Detail"
-      : pathname.startsWith("/results/")
-      ? "Benchmark Results"
-      : "Control Plane");
+
+  let breadcrumb = ROUTE_TITLES[pathname];
+  if (!breadcrumb) {
+    if (pathname.startsWith("/datasets/")) {
+      breadcrumb = { section: "Data", title: "Dataset Detail" };
+    } else if (pathname.startsWith("/languages/")) {
+      breadcrumb = { section: "Registry", title: "Language Detail" };
+    } else if (pathname.startsWith("/experiments/")) {
+      breadcrumb = { section: "Training", title: "Experiment Detail" };
+    } else {
+      breadcrumb = { section: "Foundry", title: "Control Plane" };
+    }
+  }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-surface/80 px-4 backdrop-blur-md sm:px-6 transition-colors">
-      <button
-        type="button"
-        onClick={onOpenNav}
-        aria-label="Open navigation"
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-surface-muted md:hidden"
-      >
-        <MenuIcon className="h-5 w-5" />
-      </button>
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-xl sm:px-8 transition-colors">
+      <div className="flex items-center gap-3 min-w-0">
+        <button
+          type="button"
+          onClick={onOpenNav}
+          aria-label="Open navigation menu"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-foreground-secondary transition-colors hover:bg-surface-secondary hover:text-foreground md:hidden cursor-pointer"
+        >
+          <MenuIcon className="h-4 w-4" />
+        </button>
 
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="text-xs font-medium text-muted hidden sm:inline">Foundry /</span>
-        <h1 className="truncate text-sm font-semibold sm:text-base text-foreground tracking-tight">
-          {currentTitle}
-        </h1>
+        {/* Quiet Breadcrumb */}
+        <div className="flex items-center gap-2 min-w-0 text-xs">
+          <span className="text-foreground-muted hidden sm:inline">
+            {breadcrumb.section}
+          </span>
+          <span className="text-foreground-muted/60 hidden sm:inline">/</span>
+          <span className="truncate font-medium text-foreground">
+            {breadcrumb.title}
+          </span>
+        </div>
       </div>
 
-      <div className="ml-auto flex items-center gap-2 sm:gap-3">
-        {/* Service Liveness Beacon */}
-        <div className="hidden lg:flex items-center gap-2 rounded-full border border-border bg-surface-muted/50 px-2.5 py-1 text-xs">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-          </span>
-          <span className="text-[11px] font-medium text-muted">API Online</span>
-        </div>
-
-        <LanguageSelector />
+      <div className="flex items-center gap-4">
+        <SystemStatus />
         <ThemeToggle />
       </div>
     </header>

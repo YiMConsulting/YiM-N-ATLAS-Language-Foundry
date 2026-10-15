@@ -16,26 +16,47 @@ export function TrainingSettingsCard({
   const t = experiment.training;
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-5">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
-        Training Settings
-      </h3>
-      <dl className="mt-3 divide-y divide-border">
-        <KvRow label="Method" value={a.method.toUpperCase()} />
-        <KvRow label="Rank / Alpha" value={`${a.rank} / ${a.alpha}`} />
-        <KvRow label="Dropout" value={a.dropout} />
-        <KvRow label="Target modules" value={a.target_modules.join(", ")} />
-        <KvRow
-          label="Learning rate"
-          value={formatLearningRate(t.learning_rate)}
-        />
-        <KvRow label="Epochs" value={t.epochs} />
-        <KvRow
-          label="Batch / Accum"
-          value={`${t.per_device_batch_size} / ${t.gradient_accumulation_steps}`}
-        />
-        <KvRow label="Seed" value={t.seed} />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between border-b border-border pb-3">
+        <h3 className="text-sm font-medium text-foreground">
+          LoRA Hyperparameters &amp; Schedule
+        </h3>
+        <span className="rounded-full bg-accent-soft px-2.5 py-0.5 font-mono text-[11px] text-accent">
+          r={a.rank} &alpha;={a.alpha}
+        </span>
+      </div>
+      <dl className="divide-y divide-border text-xs">
+        <div className="py-2.5">
+          <KvRow label="Adaptation Method" value={a.method.toUpperCase()} />
+        </div>
+        <div className="py-2.5">
+          <KvRow label="LoRA Rank / Alpha" value={`${a.rank} / ${a.alpha}`} />
+        </div>
+        <div className="py-2.5">
+          <KvRow label="Adapter Dropout" value={a.dropout} />
+        </div>
+        <div className="py-2.5">
+          <KvRow label="Target Modules" value={<span className="font-mono text-xs text-foreground">{a.target_modules.join(", ")}</span>} />
+        </div>
+        <div className="py-2.5">
+          <KvRow
+            label="Peak Learning Rate"
+            value={<span className="font-mono text-xs text-foreground">{formatLearningRate(t.learning_rate)}</span>}
+          />
+        </div>
+        <div className="py-2.5">
+          <KvRow label="Training Epochs" value={t.epochs} />
+        </div>
+        <div className="py-2.5">
+          <KvRow
+            label="Batch Size / Accumulation"
+            value={`${t.per_device_batch_size} / ${t.gradient_accumulation_steps}`}
+          />
+        </div>
+        <div className="py-2.5">
+          <KvRow label="Deterministic Seed" value={<span className="font-mono text-xs text-foreground">{t.seed}</span>} />
+        </div>
       </dl>
-    </section>
+    </div>
   );
 }
