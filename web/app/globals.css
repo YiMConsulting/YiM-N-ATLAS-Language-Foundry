@@ -2,12 +2,59 @@
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-:root {
-  color-scheme: light dark;
+:root,
+[data-theme="dark"] {
+  color-scheme: dark light;
 
   /* Typography Stack Fallbacks (overridden by next/font variable) */
   --font-sans-fallback: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono-fallback: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Dark Theme Tokens — Deep Neutral Obsidian (#0A0A0B IdeaWriteAI style) */
+  --background: #0A0A0B;
+  --surface: #121316;
+  --surface-secondary: #181A1F;
+  --surface-tertiary: #20232A;
+  --foreground: #F2F3F5;
+  --foreground-secondary: #9DA3AF;
+  --foreground-muted: #787E8B;
+  --border: #1E2128;
+  --border-subtle: #15171C;
+
+  /* N-ATLaS Emerald Glow for Dark Theme */
+  --primary-accent: #10B981;
+  --primary-accent-hover: #34D399;
+  --primary-accent-soft: rgba(16, 185, 129, 0.12);
+  --accent-contrast: #04251B;
+
+  /* Semantic Feedback Tokens */
+  --success: #34D399;
+  --success-soft: rgba(52, 211, 153, 0.12);
+  --success-border: rgba(52, 211, 153, 0.25);
+  --warning: #FBBF24;
+  --warning-soft: rgba(251, 191, 36, 0.12);
+  --warning-border: rgba(251, 191, 36, 0.25);
+  --error: #F87171;
+  --error-soft: rgba(248, 113, 113, 0.12);
+  --error-border: rgba(248, 113, 113, 0.25);
+
+  /* Sidebar Tokens */
+  --sidebar: #0A0A0B;
+  --sidebar-secondary: #141519;
+  --sidebar-foreground: #F2F3F5;
+  --sidebar-muted: #8E94A2;
+  --sidebar-border: #1B1D22;
+  --sidebar-active: #18191E;
+  --sidebar-active-text: #F2F3F5;
+
+  /* Dark mode shadows */
+  --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.6);
+  --shadow-elevated: 0 16px 40px -4px rgba(0, 0, 0, 0.85);
+}
+
+[data-theme="light"] {
+  color-scheme: light dark;
 
   /* Light Theme Tokens — Clean, Fluid, Modern AI Workspace */
   --background: #FAFAFA;
@@ -50,50 +97,6 @@
   --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
   --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.03);
   --shadow-elevated: 0 12px 32px -4px rgba(0, 0, 0, 0.06);
-}
-
-[data-theme="dark"] {
-  /* Dark Theme Tokens — Deep Neutral Obsidian (#0A0A0B IdeaWriteAI style) */
-  --background: #0A0A0B;
-  --surface: #121316;
-  --surface-secondary: #181A1F;
-  --surface-tertiary: #20232A;
-  --foreground: #F2F3F5;
-  --foreground-secondary: #9DA3AF;
-  --foreground-muted: #787E8B;
-  --border: #1E2128;
-  --border-subtle: #15171C;
-
-  /* N-ATLaS Emerald Glow for Dark Theme */
-  --primary-accent: #10B981;
-  --primary-accent-hover: #34D399;
-  --primary-accent-soft: rgba(16, 185, 129, 0.12);
-  --accent-contrast: #04251B;
-
-  /* Semantic Feedback Tokens */
-  --success: #34D399;
-  --success-soft: rgba(52, 211, 153, 0.12);
-  --success-border: rgba(52, 211, 153, 0.25);
-  --warning: #FBBF24;
-  --warning-soft: rgba(251, 191, 36, 0.12);
-  --warning-border: rgba(251, 191, 36, 0.25);
-  --error: #F87171;
-  --error-soft: rgba(248, 113, 113, 0.12);
-  --error-border: rgba(248, 113, 113, 0.25);
-
-  /* Sidebar Tokens */
-  --sidebar: #0A0A0B;
-  --sidebar-secondary: #141519;
-  --sidebar-foreground: #F2F3F5;
-  --sidebar-muted: #8E94A2;
-  --sidebar-border: #1B1D22;
-  --sidebar-active: #18191E;
-  --sidebar-active-text: #F2F3F5;
-
-  /* Dark mode shadows */
-  --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
-  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.6);
-  --shadow-elevated: 0 16px 40px -4px rgba(0, 0, 0, 0.85);
 }
 
 @theme inline {

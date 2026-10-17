@@ -8,8 +8,6 @@ import {
   XIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
 } from "@/components/icons";
 import { coreNav, mlNav, verificationNav } from "@/lib/nav-items";
 import type { NavItem } from "@/lib/nav-items";
@@ -105,7 +103,10 @@ export function Sidebar({
     try {
       const stored = localStorage.getItem("n-atlas-sidebar-collapsed");
       if (stored !== null) {
-        setIsCollapsed(stored === "true");
+        const collapsed = stored === "true";
+        queueMicrotask(() => {
+          setIsCollapsed(collapsed);
+        });
       }
     } catch {
       // Fallback if storage unavailable
