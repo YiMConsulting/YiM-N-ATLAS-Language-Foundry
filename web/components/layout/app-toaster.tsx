@@ -4,9 +4,9 @@ import { Toaster } from "sonner";
 import { useTheme } from "@/components/layout/theme-provider";
 
 export function AppToaster() {
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
 
   return (
-    <Toaster theme={theme} position="bottom-right" richColors closeButton />
+    <Toaster theme={resolvedTheme} position="bottom-right" richColors closeButton />
   );
 }

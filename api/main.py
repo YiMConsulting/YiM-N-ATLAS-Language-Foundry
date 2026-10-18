@@ -27,10 +27,12 @@ from foundry.review.human_review import (
 from foundry.datasets.split import DatasetSplit
 from api.schemas.language import Language, LanguageStatus
 from api.schemas.review_evidence import DatasetReviewEvidence
+from urllib.parse import urlsplit
 from api.schemas.inference import (
     InferenceStatusResponse,
     PlaygroundRequest,
     PlaygroundResponse,
+    TivDemoConfigResponse,
 )
 from api.services.inference_client import InferenceGatewayClient
 
@@ -544,4 +546,55 @@ def get_inference_status():
     Never fabricates model readiness if the upstream service is unavailable.
     """
     return inference_client.get_status()
+
+
+def resolve_tiv_demo_config() -> TivDemoConfigResponse:
+    """
+    Read and validate TIV_GRADIO_URL from the backend environment at runtime.
+    Validates that the URL has an http or https scheme and a valid network domain.
+    Safe: Never exposes internal secrets or other environment variables.
+    """
+    raw_url = os.getenv("TIV_GRADIO_URL", "").strip()
+    if not raw_url:
+        return TivDemoConfigResponse(
+            configured=False,
+            tiv_demo_url=None,
+            status="not_configured",
+            message="TIV_GRADIO_URL is not configured. Start the Kaggle notebook and set the public Gradio URL in the backend environment.",
+        )
+
+    try:
+        parsed = urlsplit(raw_url)
+        if parsed.scheme.lower() not in ("http", "https") or not parsed.netloc:
+            return TivDemoConfigResponse(
+                configured=False,
+                tiv_demo_url=None,
+                status="invalid_url",
+                message="Configured TIV_GRADIO_URL is invalid. A valid HTTP or HTTPS URL is required (e.g., https://<session>.gradio.live).",
+            )
+
+        cleaned_url = raw_url.rstrip("/")
+        return TivDemoConfigResponse(
+            configured=True,
+            tiv_demo_url=cleaned_url,
+            status="ready",
+            message="Tiv Gradio demo URL is configured and active.",
+        )
+    except Exception:
+        return TivDemoConfigResponse(
+            configured=False,
+            tiv_demo_url=None,
+            status="invalid_url",
+            message="Configured TIV_GRADIO_URL could not be parsed.",
+        )
+
+
+@app.get("/config/tiv-demo", response_model=TivDemoConfigResponse)
+@app.get("/api/v1/config/tiv-demo", response_model=TivDemoConfigResponse)
+def get_tiv_demo_config():
+    """
+    Public configuration endpoint exposing the runtime-configured Tiv Gradio demo URL.
+    Does not expose secrets, credentials, or internal configuration.
+    """
+    return resolve_tiv_demo_config()
 

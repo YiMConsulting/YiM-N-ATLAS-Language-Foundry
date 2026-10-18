@@ -9,7 +9,9 @@ import {
   DatasetsIcon,
   PlaygroundIcon,
   ReviewIcon,
+  SparklesIcon,
 } from "@/components/icons";
+import { TivTranslationDemo } from "@/components/playground/tiv-translation-demo";
 
 type LanguagePageProps = {
   params: Promise<{ code: string }>;
@@ -145,15 +147,25 @@ export default async function LanguageDetailPage({ params }: LanguagePageProps) 
               </Link>
               <Link
                 href="/playground"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-accent-contrast text-xs font-semibold hover:bg-accent-hover transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-border text-xs font-medium text-foreground hover:bg-surface-secondary transition-colors"
               >
-                <PlaygroundIcon className="h-3.5 w-3.5" />
+                <PlaygroundIcon className="h-3.5 w-3.5 text-accent" />
                 Playground
               </Link>
+              <a
+                href="#tiv-translation-demo"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-accent-contrast text-xs font-semibold hover:bg-accent-hover transition-colors"
+              >
+                <SparklesIcon className="h-3.5 w-3.5" />
+                Try Tiv Translation
+              </a>
             </div>
           </div>
         </div>
       )}
+
+      {/* Experimental Live Demo */}
+      {isPilot && <TivTranslationDemo />}
 
       {/* Metadata & Governance */}
       <div className="rounded-xl border border-border bg-surface p-6 space-y-4">

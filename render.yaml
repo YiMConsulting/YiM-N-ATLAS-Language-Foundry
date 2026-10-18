@@ -18,3 +18,5 @@ services:
         value: "true"
       - key: PROCESSED_DATA_DIR
         value: "data/processed"
+      - key: TIV_GRADIO_URL
+        sync: false

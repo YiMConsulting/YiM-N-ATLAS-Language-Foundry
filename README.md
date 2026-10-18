@@ -5,6 +5,12 @@
 > **Problem Statement 1:** Developer Infrastructure (Fine-tuning starter kits, adaptation tooling & evaluation playgrounds)  
 > **Initial Laboratory Language:** **Tiv** (`tiv`) *(Transitioned from initial scoping language **Igala** `igl`)*
 
+
+
+## Live demo: 
+https://github.com/user-attachments/assets/246480f9-22bb-4d1e-bb0e-7e7b3bb80a26
+
+
 ---
 
 ## 🌟 1. What We Are Building

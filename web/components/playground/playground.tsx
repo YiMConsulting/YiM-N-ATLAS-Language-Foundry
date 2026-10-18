@@ -11,6 +11,7 @@ import {
   type InferenceStatusResponse,
   type PlaygroundResponse,
 } from "@/lib/api-client";
+import { TivTranslationDemo } from "@/components/playground/tiv-translation-demo";
 
 type SamplePrompt = {
   label: string;
@@ -281,153 +282,17 @@ export function Playground() {
         </div>
       </div>
 
+      {/* Tiv Experimental Translation Demo (Runtime Configured Gradio) */}
+      {isTivPilot && <TivTranslationDemo />}
+
       {/* 3. Fluid Conversational Input Area */}
       <div className="space-y-3">
-        <div className="relative rounded-xl bg-surface border border-border p-4 shadow-subtle focus-within:border-accent transition-colors">
-          <textarea
-            value={prompt}
-            onChange={(e) => {
-              setPrompt(e.target.value);
-              setSelectedSample(null);
-            }}
-            rows={4}
-            maxLength={4000}
-            className="w-full bg-transparent text-sm text-foreground placeholder:text-foreground-muted focus:outline-none resize-none leading-relaxed"
-            placeholder="Type or paste English sentence to translate…"
-          />
+       
 
-          <div className="flex items-center justify-between pt-3 border-t border-border-subtle text-xs">
-            <div className="flex items-center gap-3">
-              <span className="font-mono text-[11px] text-foreground-muted">
-                {charCount} / 4,000 chars
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="text-xs font-medium text-accent hover:underline cursor-pointer"
-              >
-                {showAdvanced ? "Hide parameters" : "Parameters"}
-              </button>
-            </div>
-
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={isGenerating || !prompt.trim()}
-              onClick={handleGenerate}
-            >
-              {isGenerating ? "Translating…" : "Run Translation"}
-            </Button>
-          </div>
-        </div>
-
-        {/* Expandable Generation Parameters */}
-        {showAdvanced && (
-          <div className="rounded-lg bg-surface-secondary p-3.5 space-y-3 text-xs text-foreground-secondary border border-border-subtle">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="font-medium text-foreground block">Max Tokens</span>
-                <span className="text-[11px] text-foreground-muted">Tokens to generate (1–256)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min={1}
-                  max={256}
-                  value={maxNewTokens}
-                  onChange={(e) => setMaxNewTokens(Number(e.target.value))}
-                  className="w-24 accent-accent"
-                />
-                <span className="w-8 text-right font-mono font-medium text-foreground">
-                  {maxNewTokens}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-border-subtle pt-2">
-              <div>
-                <span className="font-medium text-foreground block">Sampling Mode</span>
-                <span className="text-[11px] text-foreground-muted">Greedy (deterministic) vs stochastic</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDoSample(!doSample)}
-                className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors cursor-pointer ${
-                  doSample
-                    ? "bg-warning text-white"
-                    : "bg-surface text-foreground border border-border"
-                }`}
-              >
-                {doSample ? "Stochastic" : "Greedy"}
-              </button>
-            </div>
-          </div>
-        )}
+        
       </div>
 
-      {/* 4. Output Canvas / Truthful Standby */}
-      <div className="space-y-4">
-        {selectedSample && isTivPilot && (
-          <div className="rounded-lg bg-accent-soft/40 p-4 space-y-1">
-            <span className="text-[11px] font-medium text-accent block">
-              Verified Ground Truth Corpus Reference
-            </span>
-            <p className="text-base font-medium font-linguistic text-foreground">
-              {selectedSample.tivReference}
-            </p>
-            <p className="text-xs text-foreground-muted pt-0.5">
-              {selectedSample.notes}
-            </p>
-          </div>
-        )}
-
-        {isGenerating ? (
-          <div className="flex items-center justify-center py-12 text-xs text-foreground-muted gap-2">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-            <span>Generating translation with N-ATLaS LoRA…</span>
-          </div>
-        ) : errorStatus ? (
-          <div className="rounded-lg bg-surface-secondary p-4 space-y-1.5 text-xs text-foreground-secondary border border-border-subtle">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-foreground">
-                {errorStatus.code === 503
-                  ? "Inference Gateway Standby (HTTP 503)"
-                  : `Service Notice (${errorStatus.code})`}
-              </span>
-              <span className="text-[11px] text-foreground-muted">Operational Truthfulness</span>
-            </div>
-            <p className="leading-relaxed">{errorStatus.message}</p>
-          </div>
-        ) : generationOutput ? (
-          <div className="space-y-3">
-            <div className="rounded-lg bg-surface p-4 border border-border shadow-subtle space-y-1">
-              <span className="text-[11px] text-foreground-muted block">
-                Model Output ({selectedLanguageCode})
-              </span>
-              <p className="text-lg font-medium font-linguistic text-foreground leading-relaxed">
-                {generationOutput.generated_text}
-              </p>
-            </div>
-
-            {/* Mandatory Governance Notice */}
-            {(generationOutput.is_smoke_test_preview ||
-              generationOutput.model_status === "smoke_test_preview") && (
-              <div className="rounded-md bg-warning-soft p-3 text-xs text-warning space-y-0.5">
-                <span className="font-semibold block">Quality Notice:</span>
-                <p className="text-[11px] leading-relaxed">
-                  {generationOutput.disclaimer ||
-                    "This output was generated by the diagnostic smoke-test adapter (smoke_test_preview). It has NOT been translation-quality validated."}
-                </p>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between text-xs text-foreground-muted font-mono pt-1">
-              <span>Latency: {generationOutput.latency_ms?.toFixed(1) ?? "—"} ms</span>
-              <span>Commit: {generationOutput.adapter_revision?.slice(0, 8) ?? "pinned"}</span>
-            </div>
-          </div>
-        ) : null}
-      </div>
+      
     </div>
   );
 }

@@ -26,21 +26,21 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function getInitialTheme(): ThemePreference {
   if (typeof window === "undefined") {
-    return "system";
+    return "dark";
   }
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === "light" || stored === "dark") {
+    if (stored === "light" || stored === "dark" || stored === "system") {
       return stored;
     }
   } catch {
     // Ignore storage access error
   }
-  return "system";
+  return "dark";
 }
 
 function getSystemTheme(): ResolvedTheme {
-  if (typeof window === "undefined") return "light";
+  if (typeof window === "undefined") return "dark";
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
@@ -68,15 +68,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
     const meta = document.querySelector('meta[name="color-scheme"]');
     if (meta) {
-      meta.setAttribute("content", theme === "system" ? "light dark" : theme);
+      meta.setAttribute(
+        "content",
+        resolvedTheme === "dark" ? "dark light" : "light dark",
+      );
     }
 
     try {
-      if (theme === "system") {
-        window.localStorage.removeItem(STORAGE_KEY);
-      } else {
-        window.localStorage.setItem(STORAGE_KEY, theme);
-      }
+      window.localStorage.setItem(STORAGE_KEY, theme);
     } catch {
       // Ignore storage write issues
     }

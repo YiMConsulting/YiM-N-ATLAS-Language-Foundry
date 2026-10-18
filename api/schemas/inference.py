@@ -131,3 +131,50 @@ class InferenceStatusResponse(BaseModel):
     device: Optional[str] = Field(default=None, description="Upstream device setting.")
     torch_dtype: Optional[str] = Field(default=None, description="Upstream torch dtype setting.")
     quantization: Optional[str] = Field(default=None, description="Upstream quantization setting.")
+
+
+class TivDemoConfigResponse(BaseModel):
+    """
+    Runtime configuration and metadata for the experimental Tiv translation Gradio demo.
+    Safe public schema returning only the public demo URL and operational status.
+    """
+
+    configured: bool = Field(
+        description="Whether a valid public Tiv Gradio demo URL is configured."
+    )
+    tiv_demo_url: Optional[str] = Field(
+        default=None,
+        description="Public URL for the experimental Tiv Gradio translation demo.",
+    )
+    status: str = Field(
+        default="not_configured",
+        description="Status code: 'ready', 'not_configured', or 'invalid_url'.",
+    )
+    message: Optional[str] = Field(
+        default=None,
+        description="Human-readable operational status or setup guidance.",
+    )
+    model_adapter: str = Field(
+        default="YiMConsulting/n-atlas-slanguage-tiv-qlora-experimental-v1",
+        description="Target QLoRA adapter repository ID.",
+    )
+    base_model: str = Field(
+        default="NCAIR1/N-ATLaS",
+        description="Base foundation model repository ID.",
+    )
+    is_experimental: bool = Field(
+        default=True,
+        description="Indicates that output is from an experimental unvalidated demo.",
+    )
+    quality_validated: bool = Field(
+        default=False,
+        description="Explicit guarantee that translation quality has not been independently validated.",
+    )
+    disclaimer: str = Field(
+        default=(
+            "This English-to-Tiv translation demo is experimental and powered by the unvalidated QLoRA adapter "
+            "'YiMConsulting/n-atlas-slanguage-tiv-qlora-experimental-v1' on Kaggle runtime. "
+            "Output has NOT been independently validated and must not be treated as production quality."
+        ),
+        description="Mandatory governance disclaimer.",
+    )

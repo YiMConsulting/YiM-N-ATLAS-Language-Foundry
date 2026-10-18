@@ -35,14 +35,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
+      data-theme="dark"
+      style={{ colorScheme: "dark" }}
       suppressHydrationWarning
       className={`h-full antialiased ${instrumentSans.variable} ${geistMono.variable}`}
     >
       <head>
-        <meta name="color-scheme" content="light dark" />
+        <meta name="color-scheme" content="dark light" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("n-atlas-theme");var resolved=t==="dark"||t==="light"?t:(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",resolved);document.documentElement.style.colorScheme=resolved;var m=document.querySelector('meta[name="color-scheme"]');if(m&&t)m.content=t;}catch(e){}})()`,
+            __html: `(function(){try{var t=localStorage.getItem("n-atlas-theme");var resolved=t==="light"?"light":(t==="dark"?"dark":(t==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):"dark"));document.documentElement.setAttribute("data-theme",resolved);document.documentElement.style.colorScheme=resolved;var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=resolved==="dark"?"dark light":"light dark";}catch(e){}})()`,
           }}
         />
       </head>

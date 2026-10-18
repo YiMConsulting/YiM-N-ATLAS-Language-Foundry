@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { useStoryNavigation } from "@/components/story/story-navigation";
 import {
   ArrowRightIcon,
   MenuIcon,
@@ -21,6 +22,7 @@ import {
 
 export function StoryHeader() {
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
+  const { navigateToMoment } = useStoryNavigation();
 
   return (
     <>
@@ -47,18 +49,30 @@ export function StoryHeader() {
           <nav className="hidden md:flex items-center gap-6 text-[13px] text-foreground-secondary">
             <a
               href="#problem"
+              onClick={(event) => {
+                event.preventDefault();
+                navigateToMoment(1);
+              }}
               className="transition-colors hover:text-foreground"
             >
               The Problem
             </a>
             <a
               href="#solution"
+              onClick={(event) => {
+                event.preventDefault();
+                navigateToMoment(2);
+              }}
               className="transition-colors hover:text-foreground"
             >
               The Solution
             </a>
             <a
               href="#outcome"
+              onClick={(event) => {
+                event.preventDefault();
+                navigateToMoment(3);
+              }}
               className="transition-colors hover:text-foreground"
             >
               The Outcome
