@@ -192,6 +192,18 @@ export type PlaygroundResponse = {
   experiment_id?: string | null;
 };
 
+export type TivDemoConfigDto = {
+  configured: boolean;
+  tiv_demo_url: string | null;
+  status: "ready" | "not_configured" | "invalid_url" | string;
+  message?: string | null;
+  model_adapter: string;
+  base_model: string;
+  is_experimental: boolean;
+  quality_validated: boolean;
+  disclaimer: string;
+};
+
 
 
 export const foundryApi = {
@@ -268,6 +280,11 @@ export const foundryApi = {
     const response = await apiClient.get<InferenceStatusResponse>(
       "/inference/status",
     );
+    return response.data;
+  },
+
+  async getTivDemoConfig() {
+    const response = await apiClient.get<TivDemoConfigDto>("/config/tiv-demo");
     return response.data;
   },
 

@@ -1,110 +1,182 @@
-# N-ATLaS Language Foundry --- API Contract
+# N-ATLaS Language Foundry — API Contract & System Specification
 
-**Status:** Frontend-facing MVP contract proposal\
-**Version:** `v1`\
-**Audience:** Frontend, backend/API, AI/ML, and integration
-contributors.
+**Status:** Control Plane v1, experimental Kaggle + Gradio demo, and retained legacy inference gateway
+**Version:** `v1.2`
+**Audience:** Frontend, backend/API, AI/ML, and integration contributors.
 
-> **Important:** This document defines the target contract for parallel
-> frontend development. It does not claim every route is implemented.
-> Existing schemas and verified ML setup are foundations; routes,
-> training execution, evaluation, and inference must be implemented and
-> tested separately. Use mock data for routes not yet available.
+> **System Truthfulness Principle:**  
+> The Foundry API is designed with strict transparency: it never fabricates model readiness, synthetic training progress, or simulated benchmark evaluations. Operational endpoints truthfully reflect backend and worker state (e.g., reporting HTTP 503 when GPU inference workers are offline rather than returning synthetic model translations).
 
-## 1. Purpose and MVP workflow
+---
 
-The API is the Foundry **control plane**: it manages language, dataset,
-review, split, and experiment state. Model training is a separate
-execution concern. Long-running training must not block an HTTP request;
-the API should create/queue an experiment and expose its status.
+## 1. System Architecture & Topology
 
-Target workflow:
+The current experimental Tiv demo and the retained legacy inference API are
+separate paths. The Kaggle + Gradio demo is the current demo workflow; the
+standalone FastAPI inference service remains as legacy code and has not been
+removed.
 
-1.  Register/list languages.
-2.  Register datasets and ingest records.
-3.  Inspect quality/audit results.
-4.  Review flagged records and record decisions.
-5.  Create reproducible train/validation/test splits.
-6.  Create and start adaptation experiments.
-7.  Inspect status, metrics, logs, and artifacts.
-8.  Try a completed adapter in the playground when inference is
-    available.
+1. **Foundry Control Plane API (`api/main.py`):**
+   - Built on FastAPI, running by default on port `8000`.
+   - Manages language registries, processed dataset catalogs, deterministic split manifests, offline human review evidence, interactive review queues, experiment records, current demo URL configuration, and separate legacy inference proxy routing.
+   - Dual-mounted route prefixes: All endpoints are accessible both with the `/api/v1` prefix and directly at root (e.g., both `/api/v1/languages` and `/languages`).
+2. **Legacy Inference Microservice (`inference_service/app/main.py`):**
+   - Provider-neutral standalone GPU-oriented service, not part of the current Kaggle + Gradio demo.
+   - Its defaults target `NCAIR1/N-ATLaS` and the older adapter `YiMConsulting/n-atlas-tiv-lora-smoke-v1`; it has not been migrated to the experimental SLANGUAGE adapter.
+   - Implements lazy model loading (weights are loaded only on the first generation call, never during startup or health probes).
+   - The legacy Control Plane gateway connects to it via `InferenceGatewayClient` (`api/services/inference_client.py`). Those routes remain in the code and are distinct from the current demo.
+3. **Frontend Application (`web/`):**
+   - Built on Next.js 16 (App Router), React 19, and TailwindCSS v4.
+   - Communicates with the Control Plane API via the typed Axios client in `web/lib/api-client.ts`.
+   - Utilizes Next.js Route Handlers (`web/app/api/review/samples/route.ts` and `web/app/api/review/submit/route.ts`) for server-side proxying of review workflows when appropriate.
+4. **Current experimental Tiv demo:** Kaggle loads the pinned base revision `e294476928aca9030e924ca27bb8e085e8581273` with `YiMConsulting/n-atlas-slanguage-tiv-qlora-experimental-v1` and serves the interface through a temporary Gradio share URL. The backend exposes its runtime-configured URL through `GET /api/v1/config/tiv-demo` (also `/config/tiv-demo`). Kaggle sessions and share URLs are temporary; this is not a permanently hosted inference service. Outputs are experimental and unvalidated. Use remains subject to the base-model and adapter repository terms and license conditions.
 
-Status labels in this document: - **Existing schema:** a schema exists
-in the repository; this does not prove a route exists. - **Proposed
-API:** shape to implement for the MVP. - **Execution-dependent:** only
-operational after a real worker/training/inference path exists.
+```mermaid
+graph TD
+    UI["Next.js Frontend (web/ :3000)"]
+    API["Control Plane API (api/main.py :8000)"]
+    DISK["Disk Manifests & Storage"]
+    CFG["Runtime Gradio URL config: TIV_GRADIO_URL"]
+    KAG["Kaggle inference session"]
+    GRA["Temporary Gradio share URL"]
+    GW["Legacy InferenceGatewayClient"]
+    INF["Legacy inference_service: older smoke-test adapter"]
+    HF["Hugging Face model and adapter repositories"]
 
-## 2. Base URL and conventions
-
-Local default (confirm actual port/prefix from the backend app entry
-point):
-
-``` text
-http://localhost:8000/api/v1
+    UI -->|HTTP / Axios| API
+    UI -.->|Proxy Routes /api/review/*| API
+    API -->|Discovers Splits & Review Evidence| DISK
+    API -->|Reads /config/tiv-demo| CFG
+    CFG --> UI
+    UI -->|Opens current demo URL| GRA
+    KAG -->|Loads base + SLANGUAGE adapter| HF
+    KAG --> GRA
+    API -.->|Legacy /playground/generate & /inference/status| GW
+    GW -.->|Optional separate API| INF
+    INF -.->|Older pinned model + adapter| HF
 ```
 
-Frontend environment variable:
+---
 
-``` text
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
-```
+## 2. Base URLs, Security, & Operational Conventions
 
-Use JSON request/response bodies except where file upload is explicitly
-implemented. Use ISO-8601 UTC timestamps. IDs are opaque strings. The
-current backend schema uses **snake_case**; preserve that in API
-payloads unless the backend explicitly configures aliases. Frontend code
-may map to camelCase internally.
+### Base URLs
 
-Recommended HTTP status codes:
+- **Control Plane Local Default:** `http://localhost:8000/api/v1` (or `http://127.0.0.1:8000/api/v1`)
+- **Frontend Environment Variable:**
+  ```bash
+  NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+  ```
+- **Legacy inference API URL (Backend Env; separate from the current Gradio demo):**
+  ```bash
+  INFERENCE_SERVICE_URL=http://localhost:8001
+  INFERENCE_TIMEOUT_SECONDS=45.0
+  ```
 
-  Code    Meaning
-  ------- ----------------------------------------
-  `200`   Successful read/action
-  `201`   Resource created
-  `202`   Long-running operation accepted/queued
-  `204`   Success with no body
-  `400`   Invalid workflow request
-  `404`   Resource not found
-  `409`   State conflict
-  `422`   Request validation failed
-  `500`   Unexpected server error
-  `503`   Required executor/model unavailable
+### Dual-Mounting Convention
 
-The normalized error envelope below is a target. Until implemented,
-handle FastAPI/Pydantic's default validation response too.
+Every control plane route is registered with both root and `/api/v1` prefixes in `api/main.py`. For example:
+- `GET /health` and `GET /api/v1/health`
+- `GET /languages` and `GET /api/v1/languages`
+- `GET /datasets` and `GET /api/v1/datasets`
+- `POST /playground/generate` and `POST /api/v1/playground/generate`
 
-## 3. Shared TypeScript contracts
+Clients may use `/api/v1/...` (recommended) or root paths interchangeably.
 
-### Language
+### CORS Configuration
 
-``` ts
-export type LanguageStatus = "discovered" | "active" | "paused" | "deprecated";
+CORS is dynamically configured via `CORS_ORIGINS`:
+- Defaults to wildcard `*` with credentials disabled.
+- If explicit comma-separated origins are provided (e.g. `http://localhost:3000,https://foundry.example.com`), `allow_credentials=True` is enabled.
+
+### Security, Demo Restrictions, & Secret Scrubbing
+
+1. **Read-Only Demonstration Mode:**
+   - Controlled by `READ_ONLY_MODE=true` (environment variable).
+   - In read-only mode, public mutation endpoints (`POST /api/v1/review/decisions`, `POST /api/v1/review/submit`) reject requests with:
+     ```json
+     {
+       "detail": "Public review submission is disabled in demonstration mode. The API is currently configured for read-only demonstration."
+     }
+     ```
+     Status: `403 Forbidden`.
+   - **Bypass for Administrators:** When `ADMIN_API_KEY` is set, passing the key via the `Authorization: Bearer <ADMIN_API_KEY>` header (or directly as `Authorization: <key>`) permits write operations even in read-only mode.
+2. **Zero Secret Leakage Guarantee:**
+   - The Inference Gateway client (`api/services/inference_client.py`) and Inference Microservice scrub all potential secrets from error messages using regex filters:
+     - Hugging Face tokens (`hf_[a-zA-Z0-9_]{10,}` $\rightarrow$ `[REDACTED]`)
+     - Bearer tokens (`Bearer [a-zA-Z0-9_\-\.]{10,}` $\rightarrow$ `Bearer [REDACTED]`)
+     - Configured API keys and token parameters
+     - Replaces raw stack traces with sanitized diagnostic messages.
+
+### HTTP Status Code Standards
+
+| Code | Meaning | Usage in Foundry |
+| :--- | :--- | :--- |
+| `200` | OK | Successful retrieval or query |
+| `201` | Created | Successfully created decision record or batch |
+| `400` | Bad Request | Missing query parameters (e.g. in proxy routes) |
+| `401` | Unauthorized | Missing or invalid API key on secured services |
+| `403` | Forbidden | Attempted write while `READ_ONLY_MODE` is active |
+| `404` | Not Found | Resource (language, dataset, split, request) does not exist |
+| `422` | Unprocessable Entity | Payload validation failure or invalid review decision value |
+| `502` | Bad Gateway | Next.js API proxy failed to reach backend control plane |
+| `503` | Service Unavailable | Upstream GPU inference service unreachable or model failed to load |
+
+---
+
+## 3. Shared TypeScript & Data Model Specifications
+
+These contracts are synchronized across Pydantic schemas in `api/schemas/`, domain models in `foundry/`, and TypeScript definitions in `web/lib/api-client.ts`.
+
+### 3.1 Language
+
+**Backend:** `api.schemas.language.Language`, `LanguageStatus`  
+**Frontend:** `LanguageDto`, `LanguageStatus`
+
+```ts
+export type LanguageStatus =
+  | "discovered"
+  | "registered"
+  | "data_available"
+  | "ready"
+  | "adapting"
+  | "adapted";
 
 export interface Language {
-  code: string; // e.g. "igl" (2-8 characters)
-  name: string;
-  native_name?: string | null;
-  status: LanguageStatus;
+  id: string;          // e.g. "lang-tiv-001"
+  name: string;        // e.g. "Tiv"
+  code: string;        // e.g. "tiv" (2-8 chars)
   description?: string | null;
-  created_at: string;
-  updated_at?: string | null;
+  status: LanguageStatus;
+  created_at: string;  // ISO-8601 UTC
+  updated_at: string;  // ISO-8601 UTC
 }
 ```
 
-Igala (`igl`) is the first target, but Foundry logic and shared UI must
-remain language-agnostic.
+*Seeded Baseline:*
+- `tiv`: Tiv (Pilot language, status: `data_available`)
+- `igl`: Igala (Exploratory language, status: `discovered`)
+- `yor`: Yoruba (Supported in base model, status: `discovered`)
+- `ha`: Hausa (Supported in base model, status: `discovered`)
+- `ibo`: Igbo (Supported in base model, status: `discovered`)
 
-### Dataset and Provenance
+---
 
-``` ts
-export type DatasetFormat =
-  | "jsonl" | "json" | "csv" | "tsv" | "parquet" | "txt";
-export type DatasetSourceType =
-  | "research" | "community" | "institutional" | "private";
+### 3.2 Dataset & Provenance
+
+**Backend:** `api.schemas.dataset.Dataset`, `DatasetProvenance`, `DatasetFormat`, `DatasetSourceType`, `DatasetStatus`  
+**Frontend:** `DatasetDto`, `DatasetStatus`
+
+```ts
+export type DatasetFormat = "jsonl" | "json" | "csv" | "tsv" | "parquet" | "txt";
+export type DatasetSourceType = "research" | "community" | "institutional" | "private";
 export type DatasetStatus =
-  | "registered" | "provenance_checked" | "audited"
-  | "reviewed" | "ready" | "rejected";
+  | "registered"
+  | "provenance_checked"
+  | "audited"
+  | "reviewed"
+  | "ready"
+  | "rejected";
 
 export interface DatasetProvenance {
   id: string;
@@ -120,64 +192,109 @@ export interface DatasetProvenance {
 }
 
 export interface Dataset {
-  id: string;
-  language_code: string;
+  id: string;                      // e.g. "tiv-mt560-v1"
+  language_code: string;           // e.g. "tiv"
   name: string;
   description?: string | null;
   format: DatasetFormat;
   source_type: DatasetSourceType;
-  record_count?: number | null;
+  record_count?: number | null;    // 184099 for Tiv MT560
   local_path?: string | null;
   provenance_id: string;
   version?: string | null;
   status: DatasetStatus;
   created_at: string;
   updated_at: string;
+  // Pilot-specific precomputed fields exposed in catalog:
+  train_records?: number;
+  validation_records?: number;
+  test_records?: number;
+  split_id?: string;
 }
 ```
 
-### Canonical dataset record
+---
 
-``` ts
-export interface DatasetRecord {
-  id: string;
-  input: string;
-  target: string;
-  language_code: string;
+### 3.3 Dataset Split
+
+**Backend:** `foundry.datasets.split.DatasetSplit`, `SplitStrategy`  
+**Frontend:** `DatasetSplitDto`, `SplitStrategy`
+
+```ts
+export type SplitStrategy = "random" | "grouped_by_input";
+
+export interface DatasetSplit {
+  id: string;                  // e.g. "tiv-mt560-v1-split-42"
+  dataset_id: string;          // e.g. "tiv-mt560-v1"
+  strategy: SplitStrategy;     // "grouped_by_input" (leakage-preventing)
+  seed: number;                // e.g. 42
+  train_ratio: number;         // e.g. 0.75
+  validation_ratio: number;    // e.g. 0.10
+  test_ratio: number;          // e.g. 0.15
+  total_records: number;       // 184099
+  train_records: number;       // 138074
+  validation_records: number;  // 18410
+  test_records: number;        // 27615
+  created_at: string;
 }
 ```
 
-`input` is the source/instruction text; `target` is the expected
-response/translation. Empty input or target is invalid for training.
-Record IDs should be stable within a dataset.
+*Validation Invariant:* Ratios sum to `1.0` within $10^{-6}$ tolerance; record counts sum exactly to `total_records`. Splits are automatically discovered at startup from `data/processed/*/split_metadata.json` or fallback manifest `data/manifests/tiv_split_metadata.json`.
 
-### Quality Audit
+---
 
-``` ts
-export type AuditStatus = "passed" | "warning" | "failed";
+### 3.4 Dataset Review Evidence (Offline Verification Pilot)
 
-export interface QualityAudit {
-  id: string;
-  dataset_id: string;
-  status: AuditStatus;
-  total_records: number;
-  valid_records: number;
-  empty_records: number;
-  malformed_records: number;
-  missing_required_fields: number;
-  duplicate_records: number;
-  duplicate_rate: number; // Range [0.0, 1.0]
-  suspected_language_mismatches: number;
-  warnings: string[];
-  errors: string[];
-  audit_version: string;
-  audited_at: string;
+**Backend:** `api.schemas.review_evidence.DatasetReviewEvidence`, `MetricScoreSummary`, `ReviewerScopeSummary`  
+**Frontend:** `DatasetReviewEvidenceDto`, `MetricScoreSummaryDto`, `ReviewerScopeSummaryDto`
+
+Separates verified, completed offline native speaker audit results (loaded from `data/manifests/*_human_review_evidence.json`) from the interactive online review queue.
+
+```ts
+export interface MetricScoreSummary {
+  metric_name: string;                 // e.g. "Translation Accuracy"
+  scale: string;                       // e.g. "1-5" or "yes/no"
+  description: string;
+  mean_score?: number | null;          // e.g. 4.7647 (null for binary metrics)
+  pass_count?: number | null;          // e.g. 51
+  total_count: number;                 // e.g. 51
+  score_distribution: Record<string, number>; // e.g. { "4": 12, "5": 39 }
+}
+
+export interface ReviewerScopeSummary {
+  assigned_reviewers: string[];        // e.g. ["REV_01", "REV_02", "REV_03", "REV_04"]
+  completed_reviewers: string[];       // e.g. ["REV_04"]
+  pending_reviewers: string[];         // e.g. ["REV_01", "REV_02", "REV_03"]
+}
+
+export interface DatasetReviewEvidence {
+  dataset_id: string;                  // e.g. "tiv-mt560-v1"
+  language_code: string;               // e.g. "tiv"
+  review_type: string;                 // "offline_manual_pilot"
+  artifact_name: string;               // e.g. "Tiv Translation Pilot - Manual Review Distribution_2.xlsx"
+  sheet_name: string;                  // e.g. "Receiver 4"
+  status: string;                      // "in_progress"
+  total_sampled_records: number;       // 203
+  reviewed_records: number;            // 51
+  pending_records: number;             // 152
+  coverage_ratio: number;              // 0.2512
+  sources_breakdown: Record<string, number>; // { "mt560": 50, "hypa": 1 }
+  reviewer_scope: ReviewerScopeSummary;
+  metrics: Record<string, MetricScoreSummary>;
+  qualitative_findings: string[];
+  qualification: string;               // Scope & verification disclaimer
+  evaluated_at: string;
 }
 ```
 
-### Human Review
+---
 
-``` ts
+### 3.5 Interactive Human Review
+
+**Backend:** `foundry.review.human_review` (`ReviewRequest`, `ReviewSampleItem`, `ReviewDecisionRecord`, `HumanReviewSummary`) and `api.main` (`SubmitDecisionRequest`, `BatchSubmitRequest`)  
+**Frontend:** `ReviewRequestDto`, `ReviewSampleItemDto`, `ReviewDecisionRecordDto`, `SubmitDecisionPayload`, `BatchSubmitPayload`, `BatchSubmitResponseDto`, `HumanReviewSummaryDto`
+
+```ts
 export type ReviewRequestStatus = "pending" | "in_progress" | "completed" | "cancelled";
 export type ReviewDecision = "correct" | "incorrect" | "needs_correction";
 
@@ -197,6 +314,8 @@ export interface ReviewSampleItem {
   record_id: string;
   input_text: string;
   expected_text: string;
+  context?: string | null;
+  flagged_reason?: string | null;
   sampled_at: string;
 }
 
@@ -211,77 +330,84 @@ export interface ReviewDecisionRecord {
   reviewed_at: string;
 }
 
+export interface SubmitDecisionRequest {
+  review_request_id: string;
+  sample_item_id: string;
+  decision: ReviewDecision | "approved" | "rejected"; // "approved" normalized to "correct", "rejected" to "incorrect"
+  reviewer_id?: string;
+  corrected_text?: string | null;
+  notes?: string | null;
+}
+
+export interface BatchSubmitRequest {
+  dataset_id: string;
+  reviewer_id: string;
+  decisions: Array<{
+    sample_id?: string;
+    sample_item_id?: string;
+    decision: ReviewDecision | "approved" | "rejected";
+    suggested_correction?: string;
+    corrected_text?: string;
+    comment?: string;
+    notes?: string;
+    review_request_id?: string;
+  }>;
+  submitted_at?: string;
+}
+
+export interface BatchSubmitResponse {
+  status: "success";
+  dataset_id: string;
+  reviewer_id: string;
+  processed_decisions: number;
+  message: string;
+  timestamp: string;
+}
+
 export interface HumanReviewSummary {
+  review_request_id: string;
   total_reviewed: number;
   correct_count: number;
   incorrect_count: number;
   needs_correction_count: number;
-  review_request_id?: string | null;
-  reviewer_id?: string | null;
-  notes?: string | null;
+  pass_rate: number;         // percentage [0.0, 100.0]
+  status: "completed" | "in_progress";
 }
 ```
 
-### Dataset split
+---
 
-``` ts
-export type SplitStrategy = "random" | "grouped_by_input";
+### 3.6 Experiment & Configuration
 
-export interface DatasetSplit {
+**Backend:** `api.schemas.experiment.Experiment`, `AdaptationConfig`, `TrainingConfig`, `RuntimeConfig`, `EvaluationMetrics`, `ExperimentArtifacts`  
+**Frontend:** `ExperimentDto`
 
-  id: string;
-  dataset_id: string;
-  strategy: SplitStrategy;
-  seed: number;
-  train_ratio: number;
-  validation_ratio: number;
-  test_ratio: number;
-  total_records: number;
-  train_records: number;
-  validation_records: number;
-  test_records: number;
-  created_at: string;
-}
-```
-
-Ratios must be in `(0, 1)` and sum to `1.0` within tolerance. Split
-counts must sum to `total_records`. Frontend should display actual
-server-returned counts, not calculate authoritative counts itself.
-
-### Experiment and nested settings
-
-The existing experiment schema includes `id`, `language_code`,
-`base_model`, `dataset_ids`, `split_id`, `adaptation`, `training`,
-`runtime`, `status`, base/adapted results, artifact metadata, optional
-`git_commit`, and timestamps.
-
-``` ts
-export type ExperimentStatus =
-  | "queued" | "running" | "evaluating" | "completed" | "failed";
+```ts
+export type ExperimentStatus = "queued" | "running" | "evaluating" | "completed" | "failed";
 export type AdaptationMethod = "lora" | "qlora";
 
 export interface AdaptationConfig {
-  method: AdaptationMethod;
-  rank: number;
-  alpha: number;
-  dropout: number;
-  target_modules: string[];
+  method: AdaptationMethod;    // "lora" (QLoRA deliberately disabled in MVP runtime)
+  rank: number;                // default 16
+  alpha: number;               // default 32
+  dropout: number;             // default 0.05
+  target_modules: string[];    // default ["q_proj", "v_proj"]
 }
 
 export interface TrainingConfig {
-  per_device_batch_size: number;
-  gradient_accumulation_steps: number;
-  learning_rate: number;
-  epochs: number;
-  warmup_ratio: number;
-  weight_decay: number;
-  seed: number;
+  per_device_batch_size: number;      // default 4
+  gradient_accumulation_steps: number; // default 4
+  learning_rate: number;              // default 2e-4
+  epochs: number;                     // default 3
+  warmup_ratio: number;               // default 0.0
+  weight_decay: number;               // default 0.0
+  seed: number;                       // default 42
 }
 
 export interface RuntimeConfig {
-  hardware: string;
-  device: string;
-  precision: string | null;
+  hardware: string;            // e.g. "Tesla T4"
+  device: string;              // "cuda"
+  precision: string | null;    // "bf16" or "fp16"
 }
 
 export interface EvaluationMetrics {
@@ -304,7 +430,7 @@ export interface ExperimentArtifacts {
 export interface Experiment {
   id: string;
   language_code: string;
-  base_model: string;
+  base_model: string;          // "NCAIR1/N-ATLaS"
   dataset_ids: string[];
   split_id: string;
   adaptation: AdaptationConfig;
@@ -320,673 +446,686 @@ export interface Experiment {
 }
 ```
 
-**Important capability limit:** `qlora` exists in the schema, but the
-current verified model setup supports standard LoRA and deliberately
-rejects QLoRA until quantized model loading is implemented. Disable
-QLoRA in the MVP UI or label it unavailable. The verified smoke test
-confirms adapter attachment and gradient flow, not completed training or
-model quality.
+---
 
-## 4. Error contract
+### 3.7 Inference Gateway & Playground
 
-Target normalized error:
+**Backend:** `api.schemas.inference.PlaygroundRequest`, `PlaygroundResponse`, `InferenceStatusResponse`  
+**Frontend:** `PlaygroundRequest`, `PlaygroundResponse`
 
-``` ts
-export interface ApiError {
-  error: {
-    code: string;
-    message: string;
-    details?: unknown;
-    request_id?: string;
-  };
+```ts
+export interface PlaygroundRequest {
+  prompt: string;              // 1 to 4000 characters; non-empty
+  language_code?: string;      // default "tiv"
+  experiment_id?: string | null;
+  max_new_tokens?: number;     // 1 to 256; default 64
+  do_sample?: boolean;         // default false
+}
+
+export interface PlaygroundResponse {
+  generated_text: string;      // Model output text
+  prompt: string;              // Source English input text
+  rendered_prompt?: string | null; // Exact instruction formatted for model
+  language_code: string;       // "tiv"
+  model: string;               // Base model repo id (for backward-compatibility)
+  base_model: string;          // "NCAIR1/N-ATLaS"
+  base_revision: string;       // "e294476928aca9030e924ca27bb8e085e8581273"
+  adapter_repo: string;        // "YiMConsulting/n-atlas-tiv-lora-smoke-v1"
+  adapter_revision: string;    // "d413bebb74ef3b971eacdd62d6bc10e75654914a"
+  model_status: string;        // "smoke_test_preview"
+  is_smoke_test_preview: boolean; // true
+  disclaimer: string;          // Mandatory governance disclaimer
+  latency_ms: number;          // Measured round-trip execution latency
+  experiment_id?: string | null;
+}
+
+export interface InferenceStatusResponse {
+  available: boolean;          // Whether upstream inference microservice is reachable
+  model_loaded: boolean;       // Whether weights are confirmed in GPU/system memory
+  message?: string | null;     // Diagnostic or error message
+  base_model: string;          // "NCAIR1/N-ATLaS"
+  base_revision: string;       // Pinned commit SHA
+  adapter_repo: string;        // Pinned LoRA repository
+  adapter_revision: string;    // Pinned LoRA commit SHA
+  model_status: string;        // "smoke_test_preview"
+  is_smoke_test_preview: boolean; // true
+  quality_validated: boolean;  // false (explicitly guarantees quality is unverified)
+  disclaimer: string;
+  device?: string | null;      // e.g. "cuda" or "cpu"
+  torch_dtype?: string | null; // e.g. "bfloat16"
+  quantization?: string | null;// e.g. "none"
 }
 ```
 
-Example:
+---
 
-``` json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "train_ratio, validation_ratio, and test_ratio must sum to 1.0",
-    "details": {"field": "train_ratio"},
-    "request_id": "req_example"
-  }
-}
-```
+### 3.8 Shared List Envelope
 
-Suggested codes: `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT`,
-`INVALID_STATE`, `EXECUTOR_UNAVAILABLE`, `MODEL_LOAD_FAILED`,
-`TRAINING_FAILED`, `INTERNAL_ERROR`.
+All list endpoints return a uniform envelope:
 
-Frontend should show a useful message and retain field-level details
-when available. Until normalized errors are implemented, also parse
-FastAPI's default `422` response.
-
-## 5. Endpoint catalogue
-
-All routes below are **proposed** unless independently verified in the
-backend. The base prefix is `/api/v1`.
-
-  ------------------------------------------------------------------------------------------------------
-  Method            Path                                       Purpose             Availability
-  ----------------- ------------------------------------------ ------------------- ---------------------
-  `GET`             `/health`                                  API health          Proposed
-
-  `GET`             `/languages`                               List languages      Proposed
-
-  `GET`             `/languages/{code}`                        Language details    Proposed
-
-  `GET`             `/datasets`                                List/filter         Proposed
-                                                               datasets            
-
-  `POST`            `/datasets`                                Register dataset    Proposed
-
-  `GET`             `/datasets/{dataset_id}`                   Dataset details     Proposed
-
-  `POST`            `/datasets/{dataset_id}/records`           Import records      Proposed
-
-  `GET`             `/datasets/{dataset_id}/records`           Preview records     Proposed
-
-  `POST`            `/datasets/{dataset_id}/audit`             Run quality audit   Proposed
-
-  `GET`             `/datasets/{dataset_id}/quality`           Read quality audit  Proposed
-
-  `POST`            `/datasets/{dataset_id}/review-requests`   Create review req   Proposed
-
-  `GET`             `/review/requests`                         List review reqs    Proposed
-
-  `GET`             `/review/requests/{id}/samples`            List sample items   Proposed
-
-  `POST`            `/review/decisions`                        Submit decision     Proposed
-
-  `GET`             `/review/requests/{id}/summary`            Read review summary Proposed
-
-  `POST`            `/datasets/{dataset_id}/splits`            Create split        Proposed
-  `GET`             `/datasets/{dataset_id}/splits`            List dataset splits Implemented (verified)
-  `GET`             `/splits/{split_id}`                       Split details       Implemented (verified)
-  `GET`             `/datasets/{dataset_id}/review-evidence`   Review evidence     Implemented (verified)
-
-  `GET`             `/experiments`                             List/filter         Proposed
-
-                                                               experiments         
-
-  `POST`            `/experiments`                             Create experiment   Proposed
-
-  `GET`             `/experiments/{experiment_id}`             Experiment/status   Proposed
-                                                               details             
-
-  `POST`            `/experiments/{experiment_id}/start`       Queue execution     Execution-dependent
-
-  `GET`             `/experiments/{experiment_id}/logs`        Read logs           Execution-dependent
-
-  `GET`             `/experiments/{experiment_id}/metrics`     Evaluation results  Execution-dependent
-
-  `GET`             `/experiments/{experiment_id}/artifacts`   Artifact            Execution-dependent
-                                                               metadata/links      
-
-  `GET`             `/experiments/compare?ids=a,b`             Compare experiments Proposed
-
-  `POST`            `/playground/generate`                     Generate text       Execution-dependent
-  ------------------------------------------------------------------------------------------------------
-
-### Shared list response
-
-Use this pagination envelope for list routes:
-
-``` ts
-export interface PaginatedResponse<T> {
+```ts
+export interface ApiListResponse<T> {
   items: T[];
   total: number;
-  limit: number;
-  offset: number;
 }
 ```
 
-Proposed default `limit` is 20 and `offset` is 0. Query filters should
-be documented per route.
+*(Endpoints returning additional metadata include it at root, e.g., `/review/requests/{id}/samples` adds `review_request_id`).*
 
-## 6. Endpoint request/response examples
+---
 
-### Health
+## 4. Master Endpoint Implementation Status
 
-`GET /health`
+| Method | Route Path | Dual Root Path | Description | Implementation Status | Frontend Integration |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/health` | `/health`, `/healthz` | Process liveness & health | **Implemented & Verified** | Status bar / probes |
+| `GET` | `/api/v1/` | `/` | API service discovery info | **Implemented & Verified** | Discovery link |
+| `GET` | `/api/v1/languages` | `/languages` | List registered languages | **Implemented & Verified** | `/languages` page |
+| `GET` | `/api/v1/languages/{code}` | `/languages/{code}` | Get language by ISO code | **Implemented & Verified** | `foundryApi.getLanguage` |
+| `GET` | `/api/v1/datasets` | `/datasets` | List processed datasets | **Implemented & Verified** | `/datasets` page |
+| `GET` | `/api/v1/datasets/{id}` | `/datasets/{id}` | Get dataset by ID | **Implemented & Verified** | `/datasets/[id]` page |
+| `GET` | `/api/v1/splits/{id}` | `/splits/{id}` | Get split metadata by ID | **Implemented & Verified** | `foundryApi.getSplit` |
+| `GET` | `/api/v1/datasets/{id}/splits` | `/datasets/{id}/splits` | List splits for a dataset | **Implemented & Verified** | `/datasets/[id]` SplitBar |
+| `GET` | `/api/v1/datasets/{id}/review-evidence` | `/datasets/{id}/review-evidence` | Get offline review evidence | **Implemented & Verified** | `/datasets/[id]`, `/evidence`, `/review` |
+| `GET` | `/api/v1/review/requests` | `/review/requests` | List active review requests | **Implemented & Verified** | `/review` ReviewPortal |
+| `GET` | `/api/v1/review/requests/{id}` | `/review/requests/{id}` | Get review request by ID | **Implemented & Verified** | `foundryApi.getReviewRequest` |
+| `GET` | `/api/v1/review/requests/{id}/samples` | `/review/requests/{id}/samples` | Get sample items for review | **Implemented & Verified** | `/review`, `/api/review/samples` |
+| `POST` | `/api/v1/review/decisions` | `/review/decisions` | Submit single review decision | **Implemented & Verified** | Single review actions |
+| `POST` | `/api/v1/review/submit` | `/review/submit`, `/api/reviews/submit` | Submit batch review decisions | **Implemented & Verified** | `/review` Batch submit, `/api/review/submit` |
+| `GET` | `/api/v1/review/requests/{id}/summary` | `/review/requests/{id}/summary` | Aggregate review metrics | **Implemented & Verified** | `foundryApi.getReviewSummary` |
+| `GET` | `/api/v1/experiments` | `/experiments` | List adaptation experiments | **Implemented (Standby)** | `/experiments`, `/results` (Returns `[]`) |
+| `GET` | `/api/v1/experiments/{id}` | `/experiments/{id}` | Get experiment details | **Implemented (Standby)** | 404 for unknown IDs |
+| `POST` | `/api/v1/playground/generate` | `/playground/generate` | Generate text via inference gateway | **Implemented (Gateway)** | `/playground` (Returns 503 when worker is offline) |
+| `GET` | `/api/v1/inference/status` | `/inference/status` | Upstream model & engine status | **Implemented (Gateway)** | Truthful worker status |
+| `POST` | `/api/v1/datasets` | `/datasets` | Register new dataset | *Proposed (Roadmap)* | UI shows static/seeded |
+| `POST` | `/api/v1/datasets/{id}/records` | `/datasets/{id}/records` | Ingest record batches | *Proposed (Roadmap)* | Offline ingestion used |
+| `POST` | `/api/v1/datasets/{id}/audit` | `/datasets/{id}/audit` | Trigger quality audit run | *Proposed (Roadmap)* | Offline audit used |
+| `POST` | `/api/v1/datasets/{id}/splits` | `/datasets/{id}/splits` | Generate new split | *Proposed (Roadmap)* | Offline split script used |
+| `POST` | `/api/v1/experiments` | `/experiments` | Create new experiment run | *Proposed (Roadmap)* | UI modal placeholder |
+| `POST` | `/api/v1/experiments/{id}/start` | `/experiments/{id}/start` | Trigger ML training job | *Execution-dependent* | Script execution used |
+| `GET` | `/api/v1/experiments/{id}/logs` | `/experiments/{id}/logs` | Stream training logs | *Execution-dependent* | Local file storage |
+| `GET` | `/api/v1/experiments/{id}/metrics` | `/experiments/{id}/metrics` | Live evaluation metrics | *Execution-dependent* | Manifest storage |
+| `GET` | `/api/v1/experiments/{id}/artifacts` | `/experiments/{id}/artifacts` | Download adapter artifacts | *Execution-dependent* | Hugging Face Hub hosted |
 
-``` json
+---
+
+## 5. Detailed Endpoint Payloads & Examples
+
+### 5.1 Service Health & Root Discovery
+
+#### `GET /api/v1/health` (or `/health`, `/healthz`)
+Reports control plane process availability.
+
+**Response (`200 OK`):**
+```json
 {
   "status": "ok",
   "service": "natlas-foundry-api",
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "timestamp": "2026-10-14T14:32:00.000000Z"
 }
 ```
 
-This should report API process health only. Do not claim GPU/model
-readiness unless explicitly checked.
+#### `GET /`
+Returns service discovery metadata and operational mode.
 
-### Languages
-
-`GET /languages` returns `PaginatedResponse<Language>` (or a simple
-`{items, total}` list if pagination is not needed for the initial
-registry). Optional filters: `status`, `search`.
-
-`GET /languages/{code}` returns a `Language`, or `404`.
-
-### Register dataset
-
-`POST /datasets`
-
-``` json
+**Response (`200 OK`):**
+```json
 {
-  "language_code": "igl",
-  "name": "Igala starter corpus",
-  "description": "Reviewed examples for initial adaptation experiments",
-  "format": "jsonl",
-  "source_type": "research",
-  "provenance_id": "prov_example_001",
-  "version": "v1"
+  "service": "N-ATLAS Language Foundry Control Plane",
+  "status": "healthy",
+  "version": "0.1.0",
+  "read_only_mode": false,
+  "docs_url": "/docs",
+  "health_url": "/health",
+  "review_requests_url": "/api/v1/review/requests",
+  "review_evidence_url": "/api/v1/datasets/{dataset_id}/review-evidence"
 }
 ```
 
-Response: `201 Created` with `Dataset`. The server creates the
-ID/timestamps. `provenance_id` must reference a real provenance record;
-the sample ID is illustrative. A dataset must not become `ready` until
-required provenance, ingestion, and quality checks pass.
+---
 
-### Import records
+### 5.2 Languages
 
-`POST /datasets/{dataset_id}/records`
+#### `GET /api/v1/languages`
+Lists registered languages.
 
-``` json
-{
-  "records": [
-    {
-      "id": "igl-001",
-      "input": "How are you?",
-      "target": "Awa nɔ?",
-      "language_code": "igl"
-    }
-  ],
-  "mode": "append"
-}
-```
-
-`mode` (`append` or `replace`) is proposed and must be implemented
-explicitly. Backend must define duplicate-ID behavior and reject invalid
-records transparently.
-
-Target response:
-
-``` json
-{
-  "dataset_id": "dataset_example_001",
-  "received": 1,
-  "accepted": 1,
-  "rejected": 0,
-  "errors": []
-}
-```
-
-These counts are example values, not project data.
-
-### Record preview
-
-`GET /datasets/{dataset_id}/records?limit=20&offset=0`
-
-Returns `PaginatedResponse<DatasetRecord>`. If the dataset has no
-records, return an empty list rather than a fabricated record.
-
-### Quality audit
-
-`POST /datasets/{dataset_id}/audit`
-
-Runs automated quality audit on the specified dataset.
-
-Target response: `200 OK` or `201 Created` with `QualityAudit`:
-
-``` json
-{
-  "id": "audit_example_001",
-  "dataset_id": "dataset_example_001",
-  "status": "passed",
-  "total_records": 100,
-  "valid_records": 98,
-  "empty_records": 0,
-  "malformed_records": 0,
-  "missing_required_fields": 0,
-  "duplicate_records": 2,
-  "duplicate_rate": 0.02,
-  "suspected_language_mismatches": 0,
-  "warnings": ["Duplicate records detected: 2"],
-  "errors": [],
-  "audit_version": "1.0",
-  "audited_at": "2026-10-09T12:00:00Z"
-}
-```
-
-`GET /datasets/{dataset_id}/quality` returns the latest `QualityAudit` summary or `404` when no audit exists.
-
-### Human Review Workflow
-
-1. **Create Review Request:**
-   `POST /datasets/{dataset_id}/review-requests`
-
-   ``` json
-   {
-     "sample_size": 30,
-     "reviewer_id": "reviewer_001"
-   }
-   ```
-
-   Response: `201 Created` with `ReviewRequest`:
-   ``` json
-   {
-     "id": "rev_req_001",
-     "dataset_id": "dataset_example_001",
-     "reviewer_id": "reviewer_001",
-     "sample_size": 30,
-     "status": "pending",
-     "created_at": "2026-10-09T12:30:00Z",
-     "updated_at": null
-   }
-   ```
-
-2. **Fetch Sample Items to Review:**
-   `GET /review/requests/{id}/samples`
-
-   ``` json
-   {
-     "items": [
-       {
-         "id": "sample_001",
-         "review_request_id": "rev_req_001",
-         "record_id": "igl-001",
-         "input_text": "How are you?",
-         "expected_text": "Awa nɔ?",
-         "sampled_at": "2026-10-09T12:30:00Z"
-       }
-     ],
-     "total": 1
-   }
-   ```
-
-3. **Submit Review Decision:**
-   `POST /review/decisions`
-
-   ``` json
-   {
-     "review_request_id": "rev_req_001",
-     "sample_item_id": "sample_001",
-     "decision": "correct",
-     "reviewer_id": "reviewer_001",
-     "corrected_text": null,
-     "notes": "Natural and grammatically valid tone markings."
-   }
-   ```
-
-   Allowed decisions: `"correct"`, `"incorrect"`, `"needs_correction"`. If `"needs_correction"` is selected, `corrected_text` should provide the suggested revision.
-
-   Response: `201 Created` with `ReviewDecisionRecord`.
-
-4. **Review Request Summary:**
-   `GET /review/requests/{id}/summary`
-
-   ``` json
-   {
-     "total_reviewed": 30,
-     "correct_count": 28,
-     "incorrect_count": 0,
-     "needs_correction_count": 2,
-     "review_request_id": "rev_req_001",
-     "reviewer_id": "reviewer_001",
-     "notes": "Reviewed and verified."
-   }
-   ```
-
-5. **Persistence Model & State Limitations:**
-   Interactive review requests and decisions (`/review/requests`, `/review/decisions`, `/review/decisions/batch`) are currently stored in process memory only. They do not survive an API service restart until durable database persistence is provisioned.
-
-6. **Dataset Review Evidence (Offline Verification Pilot):**
-   `GET /datasets/{dataset_id}/review-evidence`
-   (Also mounted under `/api/v1/datasets/{dataset_id}/review-evidence`)
-
-   Retrieves verified offline human review evidence for a dataset loaded from sanitized provenance manifests (`data/manifests/*_human_review_evidence.json`). This separates completed offline evaluation pilots (e.g. native linguist workbook reviews) from the interactive review queue.
-
-   Response: `200 OK` with `DatasetReviewEvidence`:
-   ``` json
-   {
-     "dataset_id": "tiv-mt560-v1",
-     "language_code": "tiv",
-     "artifact_name": "Tiv Translation Pilot - Manual Review Distribution_2.xlsx",
-     "evidence_source": "data/manifests/tiv_human_review_evidence.json",
-     "reviewed_records_count": 51,
-     "total_distributed_records": 203,
-     "review_coverage_pct": 25.12,
-     "source_scope": {
-       "mt560_records": 50,
-       "hypa_records": 1
-     },
-     "reviewer_scope": {
-       "completed_evaluators": ["REV_04"],
-       "pending_evaluators": ["REV_01", "REV_02", "REV_03"],
-       "total_planned_evaluators": 4,
-       "evaluators_completed_count": 1
-     },
-     "metric_summaries": {
-       "translation_accurate": {
-         "metric": "translation_accurate",
-         "scale": "1-5 integer scale",
-         "count": 51,
-         "mean": 4.7647,
-         "min": 4.0,
-         "max": 5.0,
-         "score_breakdown": { "5": 39, "4": 12 },
-         "definition": "Accuracy of translated meaning against source English text."
-       },
-       "meaning_complete": {
-         "metric": "meaning_complete",
-         "scale": "binary (Yes/No)",
-         "count": 51,
-         "mean": 1.0,
-         "pass_count": 51,
-         "definition": "Whether the core meaning is fully retained without omissions."
-       },
-       "tiv_naturalness": {
-         "metric": "tiv_naturalness",
-         "scale": "1-5 integer scale",
-         "count": 51,
-         "mean": 5.0,
-         "min": 5.0,
-         "max": 5.0,
-         "score_breakdown": { "5": 51 },
-         "definition": "Fluency, idiomatic phrasing, and naturalness in native Tiv."
-       },
-       "format_acceptable": {
-         "metric": "format_acceptable",
-         "scale": "binary (Yes/No)",
-         "count": 51,
-         "mean": 1.0,
-         "pass_count": 51,
-         "definition": "Punctuation, casing, and structure adherence."
-       }
-     },
-     "qualitative_observations": [
-       "Reviewer notes highlight idiomatic Tiv phrasing such as 'zwa Buter' (English language) and valid syntactic ordering.",
-       "Reviewer identified minor reference shifts (e.g. English page 29 cited as Tiv translation page 11) accounting for score 4 ratings.",
-       "Reviewer noted repeated identical English source inputs with consistent, faithful translations."
-     ],
-     "qualification_disclaimer": "These figures represent reviewer-recorded qualitative judgments from evaluator REV_04 across a sample of 51 records (25.1% of the 203-record pilot distribution), not automated or independently verified full-dataset quality certifications.",
-     "recorded_at": "2026-10-12T11:00:00Z"
-   }
-   ```
-
-   Status codes:
-   - `200 OK`: Evidence found and returned.
-   - `404 Not Found`: Dataset unknown or no offline review evidence exists for the dataset.
-
-### Create split
-
-`POST /datasets/{dataset_id}/splits`
-
-``` json
-{
-  "strategy": "random",
-  "seed": 42,
-  "train_ratio": 0.8,
-  "validation_ratio": 0.1,
-  "test_ratio": 0.1
-}
-```
-
-Response: `201 Created` with `DatasetSplit`. Reject invalid ratios and
-inconsistent counts. The same dataset version, strategy, and seed should
-produce a reproducible split.
-
-### Create experiment
-
-`POST /experiments`
-
-``` json
-{
-  "id": "exp_igl_001",
-  "language_code": "igl",
-  "base_model": "NCAIR1/N-ATLaS",
-  "dataset_ids": ["dataset_example_001"],
-  "split_id": "split_example_001",
-  "adaptation": {
-    "method": "lora",
-    "rank": 16,
-    "alpha": 32,
-    "dropout": 0.05,
-    "target_modules": ["q_proj", "v_proj"]
-  },
-  "training": {
-    "per_device_batch_size": 1,
-    "gradient_accumulation_steps": 4,
-    "learning_rate": 0.0002,
-    "epochs": 1,
-    "warmup_ratio": 0.0,
-    "weight_decay": 0.0,
-    "seed": 42
-  },
-  "runtime": {
-    "hardware": "Tesla T4",
-    "device": "cuda",
-    "precision": "fp16"
-  }
-}
-```
-
-Response: `201 Created` with `Experiment`, normally initially `queued`.
-Values are a proposed small-run example, not a validated training
-recipe. Backend must verify the dataset/split relationship and supported
-runtime settings. Current schema requires the caller-provided experiment
-`id`; change to server-generated IDs only if schema and contract are
-updated together.
-
-### Start experiment
-
-`POST /experiments/{experiment_id}/start`
-
-``` json
-{"confirm": true}
-```
-
-Target response: `202 Accepted`
-
-``` json
-{
-  "experiment_id": "exp_igl_001",
-  "status": "queued",
-  "message": "Experiment accepted for execution"
-}
-```
-
-This route must not claim execution has started unless a real
-executor/worker has accepted the job. If execution is unavailable,
-return `503` with `EXECUTOR_UNAVAILABLE`.
-
-### Experiment detail/status
-
-`GET /experiments/{experiment_id}` returns `Experiment`.
-
-Expected lifecycle:
-
-``` text
-queued -> running -> evaluating -> completed
-                              \-> failed
-```
-
-The frontend should poll while status is non-terminal, using a modest
-interval (e.g. 3--5 seconds), and stop at `completed` or `failed`.
-Include a useful failure message or log reference, never secrets.
-
-### Logs, metrics, and artifacts
-
--   `GET /experiments/{id}/logs`: available logs or a log reference.
--   `GET /experiments/{id}/metrics`: base/adapted results when
-    available.
--   `GET /experiments/{id}/artifacts`: artifact metadata and permitted
-    download URLs.
-
-Example metrics response before evaluation:
-
-``` json
-{
-  "experiment_id": "exp_igl_001",
-  "base_results": null,
-  "adapted_results": null
-}
-```
-
-`null` means not available, not zero. Paths such as `adapter_path` and
-`metrics_path` are not necessarily public URLs. Only return download
-links if a route/storage layer actually serves them.
-
-### Compare experiments
-
-`GET /experiments/compare?ids=exp_igl_001,exp_igl_002`
-
-Target response:
-
-``` json
+**Response (`200 OK`):**
+```json
 {
   "items": [
     {
-      "experiment_id": "exp_igl_001",
-      "status": "completed",
-      "base_results": null,
-      "adapted_results": null
+      "id": "lang-tiv-001",
+      "code": "tiv",
+      "name": "Tiv",
+      "status": "data_available",
+      "description": "Primary pilot language with verified English-Tiv parallel corpus and splits.",
+      "created_at": "2026-10-14T12:00:00Z",
+      "updated_at": "2026-10-14T12:00:00Z"
+    },
+    {
+      "id": "lang-igl-002",
+      "code": "igl",
+      "name": "Igala",
+      "status": "discovered",
+      "description": "Exploratory Nigerian language under provenance and corpus investigation.",
+      "created_at": "2026-10-14T12:00:00Z",
+      "updated_at": "2026-10-14T12:00:00Z"
+    }
+  ],
+  "total": 5
+}
+```
+
+#### `GET /api/v1/languages/{code}`
+Retrieves a single language by ISO code (case-insensitive). Returns `404 Not Found` if missing.
+
+---
+
+### 5.3 Datasets & Splits
+
+#### `GET /api/v1/datasets`
+Lists cataloged datasets.
+
+**Response (`200 OK`):**
+```json
+{
+  "items": [
+    {
+      "id": "tiv-mt560-v1",
+      "language_code": "tiv",
+      "name": "Tiv MT560 Parallel Corpus V1",
+      "description": "English-Tiv sentence pairs from MT560 with deterministic grouped splitting.",
+      "format": "jsonl",
+      "source_type": "research",
+      "record_count": 184099,
+      "train_records": 138074,
+      "validation_records": 18410,
+      "test_records": 27615,
+      "split_id": "tiv-mt560-v1-split-42",
+      "provenance_id": "prov-tiv-mt560",
+      "version": "252074f0d4c82c0005099b5eb4043fddc43026f1",
+      "status": "registered",
+      "local_path": "data/processed/tiv-mt560-v1",
+      "created_at": "2026-10-14T12:00:00Z",
+      "updated_at": "2026-10-14T12:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+#### `GET /api/v1/datasets/{dataset_id}`
+Retrieves a single dataset by ID. Returns `404 Not Found` if the dataset does not exist.
+
+#### `GET /api/v1/datasets/{dataset_id}/splits`
+Lists all validated split configurations associated with the specified dataset.
+
+**Response (`200 OK`):**
+```json
+{
+  "items": [
+    {
+      "id": "tiv-mt560-v1-split-42",
+      "dataset_id": "tiv-mt560-v1",
+      "strategy": "grouped_by_input",
+      "seed": 42,
+      "train_ratio": 0.75,
+      "validation_ratio": 0.1,
+      "test_ratio": 0.15,
+      "total_records": 184099,
+      "train_records": 138074,
+      "validation_records": 18410,
+      "test_records": 27615,
+      "created_at": "2026-10-11T02:21:58.238666Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+#### `GET /api/v1/splits/{split_id}`
+Retrieves split details directly by split identifier.
+
+---
+
+### 5.4 Dataset Review Evidence (Offline Verification Pilot)
+
+#### `GET /api/v1/datasets/{dataset_id}/review-evidence`
+Retrieves offline linguistic evaluation evidence from disk manifests (`data/manifests/*_human_review_evidence.json`). Returns `404` if the dataset is unknown or has no recorded evidence manifest.
+
+**Response (`200 OK`):**
+```json
+{
+  "dataset_id": "tiv-mt560-v1",
+  "language_code": "tiv",
+  "review_type": "offline_manual_pilot",
+  "artifact_name": "Tiv Translation Pilot - Manual Review Distribution_2.xlsx",
+  "sheet_name": "Receiver 4",
+  "status": "in_progress",
+  "total_sampled_records": 203,
+  "reviewed_records": 51,
+  "pending_records": 152,
+  "coverage_ratio": 0.2512,
+  "sources_breakdown": {
+    "mt560": 50,
+    "hypa": 1
+  },
+  "reviewer_scope": {
+    "assigned_reviewers": ["REV_01", "REV_02", "REV_03", "REV_04"],
+    "completed_reviewers": ["REV_04"],
+    "pending_reviewers": ["REV_01", "REV_02", "REV_03"]
+  },
+  "metrics": {
+    "translation_accurate": {
+      "metric_name": "Translation Accuracy",
+      "scale": "1-5",
+      "description": "Fidelity of translated meaning compared to source English sentence (5 = Perfectly accurate, 4 = Accurate with minor nuance differences).",
+      "mean_score": 4.7647,
+      "pass_count": 51,
+      "total_count": 51,
+      "score_distribution": {
+        "4": 12,
+        "5": 39
+      }
+    },
+    "meaning_complete": {
+      "metric_name": "Meaning Completeness",
+      "scale": "yes/no",
+      "description": "Preservation of full meaning without omissions or hallucinations.",
+      "mean_score": null,
+      "pass_count": 51,
+      "total_count": 51,
+      "score_distribution": {
+        "Yes": 51
+      }
+    },
+    "tiv_naturalness": {
+      "metric_name": "Tiv Naturalness",
+      "scale": "1-5",
+      "description": "Fluency and idiomatic phrasing in native Tiv (5 = Highly fluent native Tiv phrasing).",
+      "mean_score": 5.0,
+      "pass_count": 51,
+      "total_count": 51,
+      "score_distribution": {
+        "5": 51
+      }
+    },
+    "format_acceptable": {
+      "metric_name": "Formatting Acceptability",
+      "scale": "yes/no",
+      "description": "Correct preservation of punctuation, casing, quotes, brackets, and alphanumeric tokens.",
+      "mean_score": null,
+      "pass_count": 51,
+      "total_count": 51,
+      "score_distribution": {
+        "Yes": 51
+      }
+    }
+  },
+  "qualitative_findings": [
+    "Native idiomatic phrasing consistently validated (e.g. 'zwa Buter' for English language).",
+    "Score 4 annotations occurred primarily on external page-number shifts (e.g., page 29 in source English referenced as page 11 in target Tiv publication edition).",
+    "Alphanumeric structured reference tokens (e.g., 'A - D ) .') and standard biblical orthography ('Ekesodu') correctly maintained across parallel segments.",
+    "Lexical repetition in historic slogans ('yôô nen , yôô nen') verified as grammatically appropriate imperative emphasis in natural Tiv."
+  ],
+  "qualification": "Reviewer-reported and reviewer-recorded judgments from evaluator REV_04 during the manual pilot. These figures represent sample observations (51/203 pairs) and do not constitute independent automated quality verification or complete dataset sign-off.",
+  "evaluated_at": "2026-10-12T10:00:00Z"
+}
+```
+
+---
+
+### 5.5 Interactive Human Review Queue
+
+#### `GET /api/v1/review/requests`
+Lists interactive review requests. By default, returns `{"items": [], "total": 0}` until online sampling requests are initialized.
+
+#### `GET /api/v1/review/requests/{id}/samples`
+Lists sample items awaiting native linguist review.
+
+**Response (`200 OK`):**
+```json
+{
+  "items": [
+    {
+      "id": "sample-001",
+      "review_request_id": "rev-req-001",
+      "record_id": "tiv-rec-450",
+      "input_text": "Good morning, how are you doing today?",
+      "expected_text": "Ngu dedoo, u ngu nena nyian?",
+      "sampled_at": "2026-10-14T10:00:00Z"
+    }
+  ],
+  "total": 1,
+  "review_request_id": "rev-req-001"
+}
+```
+
+#### `POST /api/v1/review/decisions`
+Submits a review judgment for a single sample item. Subject to `READ_ONLY_MODE` protection.
+
+**Request:**
+```json
+{
+  "review_request_id": "rev-req-001",
+  "sample_item_id": "sample-001",
+  "decision": "correct",
+  "reviewer_id": "linguist-rev-01",
+  "corrected_text": null,
+  "notes": "Valid standard orthography."
+}
+```
+
+*Decision Normalization:* Accepts `"correct"`, `"incorrect"`, `"needs_correction"`. Also accepts `"approved"` (normalized to `"correct"`) and `"rejected"` (normalized to `"incorrect"`).
+
+**Response (`201 Created`):**
+```json
+{
+  "id": "dec-sample-001",
+  "review_request_id": "rev-req-001",
+  "sample_item_id": "sample-001",
+  "decision": "correct",
+  "reviewer_id": "linguist-rev-01",
+  "corrected_text": null,
+  "notes": "Valid standard orthography.",
+  "reviewed_at": "2026-10-14T14:40:00.000000Z"
+}
+```
+
+#### `POST /api/v1/review/submit` (or `/review/submit`, `/api/reviews/submit`)
+Submits a batch of review decisions. Consumed by the ReviewPortal and the Next.js `/api/review/submit` proxy.
+
+**Request:**
+```json
+{
+  "dataset_id": "tiv-mt560-v1",
+  "reviewer_id": "linguist-reviewer-1",
+  "decisions": [
+    {
+      "sample_id": "sample-001",
+      "decision": "correct",
+      "suggested_correction": null,
+      "comment": "Accurate phrasing"
+    },
+    {
+      "sample_id": "sample-002",
+      "decision": "needs_correction",
+      "suggested_correction": "M ngu dedoo",
+      "comment": "Minor vowel tone adjustment"
     }
   ]
 }
 ```
 
-Return actual values only. UI should show unavailable metrics as `—` or
-"Not evaluated," not zero. Comparisons should show the evaluation
-dataset/split so the user can judge comparability.
-
-### Playground generation
-
-`POST /playground/generate`
-
-``` json
+**Response (`201 Created`):**
+```json
 {
-  "prompt": "How are you?",
-  "language_code": "igl",
-  "experiment_id": "exp_igl_001",
+  "status": "success",
+  "dataset_id": "tiv-mt560-v1",
+  "reviewer_id": "linguist-reviewer-1",
+  "processed_decisions": 2,
+  "message": "Successfully recorded 2 audit decisions.",
+  "timestamp": "2026-10-14T14:40:00.000000Z"
+}
+```
+
+#### `GET /api/v1/review/requests/{id}/summary`
+Computes real-time review completion statistics and approval pass rate.
+
+**Response (`200 OK`):**
+```json
+{
+  "review_request_id": "rev-req-001",
+  "total_reviewed": 25,
+  "correct_count": 23,
+  "incorrect_count": 1,
+  "needs_correction_count": 1,
+  "pass_rate": 92.0,
+  "status": "in_progress"
+}
+```
+
+---
+
+### 5.6 Experiments & Adaptation Results
+
+#### `GET /api/v1/experiments`
+Lists adaptation runs. By default, returns truthful unpopulated state rather than simulated experiments:
+
+**Response (`200 OK`):**
+```json
+{
+  "items": [],
+  "total": 0
+}
+```
+
+#### `GET /api/v1/experiments/{id}`
+Returns `404 Not Found` with message `Experiment '{id}' not found` when querying unrecorded runs. When populated, returns full `Experiment` schema.
+
+---
+
+### 5.7 Legacy Inference Gateway & Developer Playground
+
+The routes in this section describe a retained legacy integration. They are
+not used by the current Kaggle + Gradio demo, and they still target the older
+`YiMConsulting/n-atlas-tiv-lora-smoke-v1` smoke-test adapter. The service,
+gateway client, and routes remain in the repository; they have not been
+removed or migrated to the SLANGUAGE adapter.
+
+#### `POST /api/v1/playground/generate`
+Proxies generation requests to the standalone inference microservice gateway (`INFERENCE_SERVICE_URL`).
+
+- Maps incoming `prompt` $\rightarrow$ upstream `text` parameter.
+- Strictly bounds `max_new_tokens` ($1 \le \text{tokens} \le 256$, default 64).
+- Rejects empty prompts with `422 Unprocessable Content`.
+
+**Request:**
+```json
+{
+  "prompt": "The children are learning in school.",
+  "language_code": "tiv",
   "max_new_tokens": 64,
   "do_sample": false
 }
 ```
 
-Target response:
-
-``` json
+**Response when Inference Service is Online (`200 OK`):**
+```json
 {
-  "prompt": "How are you?",
-  "generated_text": "Example generated text",
-  "language_code": "igl",
+  "generated_text": "Mbayev mba henen kwagh ken makeranta.",
+  "prompt": "The children are learning in school.",
+  "rendered_prompt": "Translate the following English text to Tiv.\nEnglish: The children are learning in school.\nTiv:",
+  "language_code": "tiv",
   "model": "NCAIR1/N-ATLaS",
-  "experiment_id": "exp_igl_001",
-  "latency_ms": 123.4
+  "base_model": "NCAIR1/N-ATLaS",
+  "base_revision": "e294476928aca9030e924ca27bb8e085e8581273",
+  "adapter_repo": "YiMConsulting/n-atlas-tiv-lora-smoke-v1",
+  "adapter_revision": "d413bebb74ef3b971eacdd62d6bc10e75654914a",
+  "model_status": "smoke_test_preview",
+  "is_smoke_test_preview": true,
+  "disclaimer": "This output was generated by the diagnostic smoke-test adapter (smoke_test_preview). It has NOT been translation-quality validated and must not be treated as production quality.",
+  "latency_ms": 342.5,
+  "experiment_id": null
 }
 ```
 
-Output and latency above are placeholders, not model results. Return
-actual measured output or an error. Until inference exists, frontend
-must label this as mock/demo mode. If an adapter is requested, verify
-that it exists and is loadable.
+**Response when Inference Service is Offline (`503 Service Unavailable`):**
+```json
+{
+  "detail": "Inference service unavailable at http://localhost:8001. Standalone GPU worker instance is not running or unreachable."
+}
+```
 
-## 7. Frontend guidance
+#### `GET /api/v1/inference/status`
+Exposes the truthful operational and governance state of the upstream inference engine.
 
-Suggested screens: 1. Overview/dashboard. 2. Languages. 3. Datasets:
-register, import, preview, quality. 4. Human review queue. 5. Dataset
-splits. 6. Experiments: create, list, status, logs, metrics, artifacts.
-7. Compare experiments. 8. Playground.
+**Response when Upstream is Offline (`200 OK`):**
+```json
+{
+  "available": false,
+  "model_loaded": false,
+  "message": "Inference service unreachable at http://localhost:8001: Connection refused",
+  "base_model": "NCAIR1/N-ATLaS",
+  "base_revision": "e294476928aca9030e924ca27bb8e085e8581273",
+  "adapter_repo": "YiMConsulting/n-atlas-tiv-lora-smoke-v1",
+  "adapter_revision": "d413bebb74ef3b971eacdd62d6bc10e75654914a",
+  "model_status": "smoke_test_preview",
+  "is_smoke_test_preview": true,
+  "quality_validated": false,
+  "disclaimer": "This output was generated by the diagnostic smoke-test adapter (smoke_test_preview). It has NOT been translation-quality validated and must not be treated as production quality.",
+  "device": null,
+  "torch_dtype": null,
+  "quantization": null
+}
+```
 
-Keep HTTP calls in one service/API-client layer rather than inside UI
-components. Minimal example:
+**Response when Upstream is Online with Weights Loaded (`200 OK`):**
+```json
+{
+  "available": true,
+  "model_loaded": true,
+  "message": "Model engine online and initialized.",
+  "base_model": "NCAIR1/N-ATLaS",
+  "base_revision": "e294476928aca9030e924ca27bb8e085e8581273",
+  "adapter_repo": "YiMConsulting/n-atlas-tiv-lora-smoke-v1",
+  "adapter_revision": "d413bebb74ef3b971eacdd62d6bc10e75654914a",
+  "model_status": "smoke_test_preview",
+  "is_smoke_test_preview": true,
+  "quality_validated": false,
+  "disclaimer": "This output was generated by the diagnostic smoke-test adapter (smoke_test_preview). It has NOT been translation-quality validated and must not be treated as production quality.",
+  "device": "cuda",
+  "torch_dtype": "bfloat16",
+  "quantization": "none"
+}
+```
 
-``` ts
-const API_BASE_URL =
+### 5.8 Current Experimental Kaggle + Gradio Demo
+
+The current demo loads the pinned base revision
+`NCAIR1/N-ATLaS@e294476928aca9030e924ca27bb8e085e8581273` and the experimental
+adapter `YiMConsulting/n-atlas-slanguage-tiv-qlora-experimental-v1` in a Kaggle
+inference session. Gradio exposes a temporary share URL; the runtime config
+endpoint below returns the backend's configured URL to the frontend. Kaggle
+sessions and share URLs can expire or change. This is not a permanently hosted
+inference service. The adapter is experimental and unvalidated; use is subject
+to the base model and adapter repository terms and license conditions.
+
+#### `GET /api/v1/config/tiv-demo` (also mounted at `/config/tiv-demo`)
+Exposes runtime configuration and the public URL for the experimental Tiv Gradio demo. It reads `TIV_GRADIO_URL` from the backend environment at request time and never exposes internal secrets, tokens, or private credentials.
+
+**Response when Gradio URL is configured and active (`200 OK`):**
+```json
+{
+  "configured": true,
+  "tiv_demo_url": "https://490f55186b25f3a26c.gradio.live",
+  "status": "ready",
+  "message": "Tiv Gradio demo URL is configured and active.",
+  "model_adapter": "YiMConsulting/n-atlas-slanguage-tiv-qlora-experimental-v1",
+  "base_model": "NCAIR1/N-ATLaS",
+  "is_experimental": true,
+  "quality_validated": false,
+  "disclaimer": "This English-to-Tiv translation demo is experimental and powered by the unvalidated QLoRA adapter 'YiMConsulting/n-atlas-slanguage-tiv-qlora-experimental-v1' on Kaggle runtime. Output has NOT been independently validated and must not be treated as production quality."
+}
+```
+
+**Response when Gradio URL is not configured / offline (`200 OK`):**
+```json
+{
+  "configured": false,
+  "tiv_demo_url": null,
+  "status": "not_configured",
+  "message": "TIV_GRADIO_URL is not configured. Start the Kaggle notebook and set the public Gradio URL in the backend environment.",
+  "model_adapter": "YiMConsulting/n-atlas-slanguage-tiv-qlora-experimental-v1",
+  "base_model": "NCAIR1/N-ATLaS",
+  "is_experimental": true,
+  "quality_validated": false,
+  "disclaimer": "This English-to-Tiv translation demo is experimental and powered by the unvalidated QLoRA adapter 'YiMConsulting/n-atlas-slanguage-tiv-qlora-experimental-v1' on Kaggle runtime. Output has NOT been independently validated and must not be treated as production quality."
+}
+```
+
+---
+
+## 6. Frontend Integration & Error Handling
+
+### 6.1 Unified Client Architecture
+
+Frontend HTTP requests are encapsulated in `web/lib/api-client.ts`:
+
+```ts
+import axios from "axios";
+
+const baseURL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "http://localhost:8000/api/v1";
+  "http://127.0.0.1:8000/api/v1"
+).replace(/\/+$/, "");
 
-export async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`);
-  if (!response.ok) {
-    throw new Error(`API request failed (${response.status})`);
-  }
-  return response.json() as Promise<T>;
-}
+export const apiClient = axios.create({
+  baseURL,
+  timeout: 15_000,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 ```
 
-Expand this client to parse API errors, handle timeouts/cancellation,
-and support mutations. Do not swallow errors or silently substitute mock
-responses.
+Components interact through domain methods (`foundryApi.listLanguages()`, `foundryApi.getDataset(id)`, `foundryApi.listDatasetSplits(id)`, `foundryApi.getDatasetReviewEvidence(id)`, `foundryApi.generate(...)`, `foundryApi.submitReviewBatch(...)`).
 
-Every data-driven page should support loading, empty, validation-error,
-server/network-error, pending/running, and success states. Keep mock
-data in a dedicated layer and make mock mode explicit. Never show
-invented metrics or mock generations as real N-ATLaS results. Use the
-same TypeScript interfaces for mocks and live responses.
+### 6.2 Truthful UI State Handling
 
-## 8. Backend implementation checklist
+The frontend provides dedicated states across all screens:
+1. **GPU Offline & Cold-Start Banners:**
+   - In `/playground`, if `POST /api/v1/playground/generate` returns HTTP `503`, the UI does not display synthetic translation text. It renders an informative banner explaining that the GPU worker instance is offline and displays the verified offline benchmark reference.
+2. **Read-Only Demonstration Protection:**
+   - In `/review`, if a reviewer attempts submission while `READ_ONLY_MODE=true` without admin credentials, the UI captures the `403 Forbidden` response and surfaces a notification to the user without crashing.
+3. **Empty Catalogs & Standby Routes:**
+   - In `/experiments` and `/results`, when `foundryApi.listExperiments()` returns `{"items": [], "total": 0}`, the UI displays the clean empty state with a call to action, acknowledging that adaptation runs are awaiting compute execution.
+4. **Offline Evidence vs Interactive Queues:**
+   - In `/datasets/[id]`, the UI presents the verified human review evidence card (`ReviewEvidenceCard`) with evaluator completion rates, accuracy distributions, and qualitative notes directly grounded in the verified manifest.
 
--   [ ] Confirm actual app entry point, port, and prefix.
--   [ ] Implement and test `GET /health`.
--   [ ] Implement language list/detail.
--   [ ] Implement dataset registration/list/detail and record
-    ingestion/preview.
--   [ ] Connect quality audit to real checks.
--   [ ] Connect review queue/decisions to the review module.
--   [ ] Implement deterministic split creation/retrieval.
--   [ ] Implement experiment create/list/detail using existing Pydantic
-    schemas.
--   [ ] Implement an executor before advertising experiment start as
-    operational.
--   [ ] Connect training progress/failure/metrics to experiment
-    lifecycle.
--   [ ] Expose artifact metadata and authorized downloads.
--   [ ] Implement inference before advertising playground as live.
--   [ ] Add route tests for success, validation failure, missing
-    resources, and invalid state transitions.
--   [ ] Update this contract as endpoints become implemented.
+---
 
-Responsibilities: - Schemas validate request/resource shapes. - Foundry
-modules implement domain behavior. - API routes translate HTTP requests
-into domain calls. - Training runner executes model work and reports
-state/artifacts. - Frontend depends on this API contract, not internal
-Python module names.
+## 7. Verification & Automated Test Coverage
 
-## 9. Decisions to finalize
+The contract and implementation are continuously verified by an automated test suite executed in the Docker environment (`yim-n-atlas-language-foundry-api:latest`).
 
+### Running the API & Gateway Tests
 
+```bash
+# Run API truthfulness and inference proxy test suite (51 tests)
+docker run --rm -v "$PWD:/app:Z" -w /app yim-n-atlas-language-foundry-api:latest \
+  pytest -v tests/test_api_truthfulness.py tests/test_inference_proxy.py
 
-1.  Persistence: SQLite or another store; behavior across API restarts.
-2.  Ingestion transport: JSON record batches versus multipart file
-    uploads.
-3.  Execution: local subprocess, queued worker, or manual Kaggle
-    execution. Do not represent a Kaggle notebook as an always-on API
-    worker without real integration.
-4.  Dataset storage: managed copies versus local paths.
-5.  Review identity and duplicate-decision behavior.
-6.  Authentication/authorization expectations for the demo.
-7.  Artifact delivery: authenticated download routes versus internal
-    paths/object storage.
-8.  Playground execution: API process, separate inference service, or
-    mock mode.
+# Run all domain schema validation tests (63 tests)
+docker run --rm -v "$PWD:/app:Z" -w /app yim-n-atlas-language-foundry-api:latest \
+  pytest tests/test_language_schema.py tests/test_dataset_schema.py \
+         tests/test_dataset_record_schema.py tests/test_dataset_split_schema.py \
+         tests/test_human_review_schema.py tests/test_experiment_schema.py \
+         tests/test_quality_schema.py
+```
 
-## 10. Contract change policy
+### Running Frontend Type-Checking
 
-1.  Update this document and the matching schema/route test together.
-2.  Prefer additive, backward-compatible changes during the hackathon.
-3.  Do not rename/remove fields without notifying the frontend owner.
-4.  Update frontend types and mock responses alongside contract changes.
-5.  Treat actual route behavior and tests as evidence of implementation;
-    this document is the target contract until verified.
+```bash
+cd web
+npx tsc --noEmit
+```
 
-**MVP principle:** The frontend can start immediately against this
-contract and mock data. Training, evaluation, and generation must be
-marked unavailable until their execution paths are implemented and
-tested.
+### Verified Test Assertions
+
+1. `test_languages_exposes_tiv_truthfully`: Confirms Tiv exists as pilot with `status=data_available` (never falsely claiming `adapted`).
+2. `test_datasets_includes_verified_tiv_dataset`: Confirms Tiv MT560 corpus is registered with exact record counts (184,099 total, 138,074 train, 18,410 val, 27,615 test).
+3. `test_get_verified_split_by_id`: Confirms split `tiv-mt560-v1-split-42` loads deterministically with `strategy=grouped_by_input`.
+4. `test_get_dataset_review_evidence_success`: Confirms review evidence manifest exposes 51 reviewed records, 203 total, 4 evaluators scope, 4.76/5 accuracy, and qualification disclaimers.
+5. `test_playground_generate_returns_503_while_unavailable`: Confirms control plane returns HTTP 503 instead of fabricating text when GPU worker is disconnected.
+6. `test_upstream_error_with_secret_is_sanitized`: Confirms all Hugging Face tokens and authorization headers are redacted from API errors.
+7. `test_submit_decision_read_only_protection`: Confirms unauthorized mutations in read-only mode receive HTTP 403 Forbidden.
+
+---
+
+## 8. Change Management & Governance
+
+1. **Additive Changes:** New fields added to responses must be optional in client TypeScript interfaces to maintain backward compatibility.
+2. **Schema/Document Synchronization:** Any modification to schemas in `api/schemas/` or routes in `api/main.py` must be accompanied by updates to `docs/api_contract.md` and `web/lib/api-client.ts`.
+3. **No Synthetic Data:** API endpoints must never serve simulated predictions under production endpoint names. If mock mode is utilized for prototyping, it must be explicitly flagged with `is_mock: true` or a `503` status.
