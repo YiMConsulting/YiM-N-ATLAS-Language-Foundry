@@ -2,7 +2,7 @@ import { CheckCircleIcon, AlertTriangleIcon } from "@/components/icons";
 
 export function WhereWeAreToday() {
   return (
-    <section id="today" className="py-20 sm:py-28 border-t border-border/60">
+    <section id="today" className="scroll-mt-20 py-20 sm:py-28 border-t border-border/60">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="max-w-2xl space-y-2 mb-14">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useStoryNavigation } from "@/components/story/story-navigation";
 import {
   UsersIcon,
   LayersIcon,
@@ -37,7 +38,7 @@ const NIGERIAN_LANGUAGES: LanguageItem[] = [
 ];
 
 export function StoryMoments() {
-  const [activeMoment, setActiveMoment] = useState<1 | 2 | 3>(1);
+  const { activeMoment, setActiveMoment } = useStoryNavigation();
   const [selectedLang, setSelectedLang] = useState<LanguageItem>(NIGERIAN_LANGUAGES[0]);
   const [animationPlaying, setAnimationPlaying] = useState(true);
   const [solutionStep, setSolutionStep] = useState<0 | 1 | 2>(0);
@@ -116,7 +117,7 @@ export function StoryMoments() {
         {/* MOMENT 1: THE PROBLEM                                    */}
         {/* ======================================================== */}
         {activeMoment === 1 && (
-          <div id="problem" className="space-y-8 animate-in fade-in duration-200">
+          <div id="problem" className="scroll-mt-20 space-y-8 animate-in fade-in duration-200">
             <div className="max-w-2xl space-y-2">
               <h3 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
                 Nigeria has extraordinary linguistic diversity. AI systems do not.
@@ -270,7 +271,7 @@ export function StoryMoments() {
         {/* MOMENT 2: THE SOLUTION                                    */}
         {/* ======================================================== */}
         {activeMoment === 2 && (
-          <div id="solution" className="space-y-8 animate-in fade-in duration-200">
+          <div id="solution" className="scroll-mt-20 space-y-8 animate-in fade-in duration-200">
             <div className="max-w-2xl space-y-2">
               <h3 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
                 Language data flows through curation, native review, and adaptation.
@@ -425,7 +426,7 @@ export function StoryMoments() {
         {/* MOMENT 3: THE OUTCOME                                     */}
         {/* ======================================================== */}
         {activeMoment === 3 && (
-          <div id="outcome" className="space-y-8 animate-in fade-in duration-200">
+          <div id="outcome" className="scroll-mt-20 space-y-8 animate-in fade-in duration-200">
             <div className="max-w-2xl space-y-2">
               <h3 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
                 An adapted model evaluated for genuine linguistic capability.
